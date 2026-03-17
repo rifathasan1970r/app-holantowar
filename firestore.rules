@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: notices
+    // Document ID: auto-generated
+    // Fields:
+    //   - title: string (required) - Title of the notice
+    //   - date: string (required) - Date of the notice
+    //   - driveLink: string (required) - Google Drive link
+    //   - createdAt: timestamp (required) - Creation time
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "rifathasan1970r@gmail.com" && request.auth.token.email_verified == true);
+    }
+
+    function isValidNotice(data) {
+      return data.keys().hasAll(['title', 'date', 'driveLink', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.date is string && data.date.size() > 0 && data.date.size() < 50 &&
+             data.driveLink is string && data.driveLink.matches("^https://.*") &&
+             data.createdAt is timestamp;
+    }
+
+    match /notices/{noticeId} {
+      // Allow ANYONE to read notices (Public access)
+      allow read: if true;
+      
+      // Only admin can create, update, or delete
+      allow create: if isAdmin() && isValidNotice(request.resource.data);
+      allow update: if isAdmin() && isValidNotice(request.resource.data);
+      allow delete: if isAdmin();
+    }
+  }
+}

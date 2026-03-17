@@ -1,0 +1,21 @@
+{
+  "name": "হলান টাওয়ার",
+  "short_name": "হলান টাওয়ার",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f766e",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "https://i.imghippo.com/files/xPV6164w.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://i.imghippo.com/files/xPV6164w.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

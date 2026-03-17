@@ -1,0 +1,35 @@
+{
+  "entities": {
+    "notices": {
+      "title": "Notice",
+      "description": "Emergency notices for the building",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Title of the notice"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the notice"
+        },
+        "driveLink": {
+          "type": "string",
+          "description": "Google Drive link to the PDF"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the notice was created"
+        }
+      },
+      "required": ["title", "date", "driveLink", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/notices/{noticeId}": {
+      "schema": "notices",
+      "description": "Collection of emergency notices"
+    }
+  }
+}
