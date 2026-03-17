@@ -113,15 +113,6 @@ export const MENU_ITEMS: MenuItem[] = [
     gradient: 'from-red-600 to-rose-500'
   },
   { 
-    id: 'water', 
-    label: 'পানির বিল', 
-    icon: Droplets, 
-    view: 'WATER_BILL',
-    color: 'bg-cyan-500',
-    description: 'ওয়াসা বিল তথ্য',
-    gradient: 'from-cyan-400 to-blue-500'
-  },
-  { 
     id: 'map', 
     label: 'ম্যাপ ও বিভিন্ন রুট', 
     icon: MapIcon, 
@@ -307,7 +298,6 @@ export const VIEW_TO_PATH: Record<string, string> = {
   SERVICE_CHARGE: '/service-charge.html',
   EMERGENCY: '/emergency.html',
   TO_LET: '/to-let.html',
-  WATER_BILL: '/water-bill.html',
   LIFT_INSTRUCTIONS: '/lift-instructions.html',
   MAINTENANCE: '/maintenance.html',
   SETTINGS: '/settings.html',
