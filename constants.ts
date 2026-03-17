@@ -20,7 +20,8 @@ import {
   Clock,
   Smartphone,
   FileText,
-  Download
+  Download,
+  Images
 } from 'lucide-react';
 import { MenuItem, Notice } from './types';
 
@@ -156,6 +157,15 @@ export const MENU_ITEMS: MenuItem[] = [
     color: 'bg-purple-500',
     description: 'অ্যাপটি ডাউনলোড করুন',
     gradient: 'from-purple-400 to-violet-600'
+  },
+  { 
+    id: 'gallery', 
+    label: 'গ্যালারি', 
+    icon: Images,
+    view: 'GALLERY',
+    color: 'bg-pink-500',
+    description: 'বিল্ডিং এর ছবিসমূহ',
+    gradient: 'from-pink-400 to-rose-600'
   },
   { 
     id: 'contact', 
@@ -308,7 +318,10 @@ export const VIEW_TO_PATH: Record<string, string> = {
   DOWNLOAD_APP: '/download-app.html',
   EMERGENCY_NOTICE_DETAIL: '/emergency-notice.html',
   MAP_ROUTES: '/map-routes.html',
-  AI_ASSISTANT: '/assistant.html'
+  AI_ASSISTANT: '/assistant.html',
+  GALLERY: '/gallery.html',
+  GALLERY_COMING_SOON: '/gallery-coming-soon.html',
+  GALLERY_CONTROL_ROOM: '/gallery-control-room.html'
 };
 
 export const BOTTOM_NAV_ITEMS = [

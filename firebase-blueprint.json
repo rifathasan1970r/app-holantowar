@@ -1,35 +1,44 @@
 {
   "entities": {
-    "notices": {
-      "title": "Notice",
-      "description": "Emergency notices for the building",
+    "GalleryCategory": {
+      "title": "Gallery Category",
+      "description": "A category in the gallery with a lock status and images.",
       "type": "object",
       "properties": {
-        "title": {
-          "type": "string",
-          "description": "Title of the notice"
+        "id": { "type": "string" },
+        "bn": { "type": "string" },
+        "en": { "type": "string" },
+        "icon": { "type": "string" },
+        "isLocked": { "type": "boolean" },
+        "images": {
+          "type": "array",
+          "items": { "type": "string" }
         },
-        "date": {
-          "type": "string",
-          "description": "Date of the notice"
-        },
-        "driveLink": {
-          "type": "string",
-          "description": "Google Drive link to the PDF"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Timestamp when the notice was created"
+        "sliderImages": {
+          "type": "array",
+          "items": { "type": "string" }
         }
       },
-      "required": ["title", "date", "driveLink", "createdAt"]
+      "required": ["bn", "en", "icon", "isLocked"]
+    },
+    "GallerySettings": {
+      "title": "Gallery Settings",
+      "description": "Global settings for the gallery, like the PIN.",
+      "type": "object",
+      "properties": {
+        "pin": { "type": "string" }
+      },
+      "required": ["pin"]
     }
   },
   "firestore": {
-    "/notices/{noticeId}": {
-      "schema": "notices",
-      "description": "Collection of emergency notices"
+    "/gallery_categories": {
+      "schema": "GalleryCategory",
+      "description": "Collection of gallery categories."
+    },
+    "/gallery_settings/config": {
+      "schema": "GallerySettings",
+      "description": "Global configuration for the gallery."
     }
   }
 }

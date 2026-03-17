@@ -33,6 +33,9 @@ import { PDFDownloadPage } from './components/PDFDownloadPage';
 import { ContactView } from './components/ContactView';
 import { DownloadAppView } from './components/DownloadAppView';
 import { DuePaymentMarquee } from './components/DuePaymentMarquee';
+import GalleryView from './components/GalleryView';
+import GalleryComingSoonView from './components/GalleryComingSoonView';
+import GalleryControlRoomView from './components/GalleryControlRoomView';
 
 const PATH_TO_VIEW: Record<string, ViewState> = Object.entries(VIEW_TO_PATH).reduce(
   (acc, [view, path]) => ({ ...acc, [path]: view as ViewState }),
@@ -502,7 +505,6 @@ const App: React.FC = () => {
         <Route path="/map-routes.html" element={<MapRoutesView onBack={() => setCurrentView('MENU')} />} />
         <Route path="/to-let.html" element={<ToLetView />} />
         <Route path="/emergency.html" element={<EmergencyView />} />
-        <Route path="/water-bill.html" element={<WaterBillView onBack={() => setCurrentView('MENU')} />} />
         <Route path="/lift-instructions.html" element={<LiftInstructionsView onBack={() => setCurrentView('MENU')} />} />
         <Route path="/maintenance.html" element={<MaintenanceView onBack={() => setCurrentView('MENU')} setView={setCurrentView} />} />
         <Route path="/settings.html" element={<SettingsView onBack={() => setCurrentView('MENU')} darkMode={darkMode} toggleDarkMode={toggleDarkMode} maintenanceMode={maintenanceMode} />} />
@@ -512,6 +514,9 @@ const App: React.FC = () => {
         <Route path="/contact.html" element={<ContactView onBack={() => setCurrentView('MENU')} setView={setCurrentView} />} />
         <Route path="/download-app.html" element={<DownloadAppView onBack={() => setCurrentView('MENU')} />} />
         <Route path="/emergency-notice.html" element={<EmergencyNoticeDetailView onBack={() => setCurrentView('HOME')} />} />
+        <Route path="/gallery.html" element={<GalleryView onBack={() => setCurrentView('MENU')} setView={setCurrentView} />} />
+        <Route path="/gallery-coming-soon.html" element={<GalleryComingSoonView onBack={() => setCurrentView('GALLERY')} />} />
+        <Route path="/gallery-control-room.html" element={<GalleryControlRoomView onBack={() => setCurrentView('GALLERY')} />} />
         
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
