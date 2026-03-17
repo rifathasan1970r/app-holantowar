@@ -321,7 +321,8 @@ export const VIEW_TO_PATH: Record<string, string> = {
   AI_ASSISTANT: '/assistant.html',
   GALLERY: '/gallery.html',
   GALLERY_COMING_SOON: '/gallery-coming-soon.html',
-  GALLERY_CONTROL_ROOM: '/gallery-control-room.html'
+  GALLERY_CONTROL_ROOM: '/gallery-control-room.html',
+  GALLERY_DETAIL: '/gallery-detail.html'
 };
 
 export const BOTTOM_NAV_ITEMS = [

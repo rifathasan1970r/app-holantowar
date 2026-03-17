@@ -34,7 +34,7 @@ import { ContactView } from './components/ContactView';
 import { DownloadAppView } from './components/DownloadAppView';
 import { DuePaymentMarquee } from './components/DuePaymentMarquee';
 import GalleryView from './components/GalleryView';
-import GalleryComingSoonView from './components/GalleryComingSoonView';
+import GalleryDetailView from './components/GalleryDetailView';
 import GalleryControlRoomView from './components/GalleryControlRoomView';
 
 const PATH_TO_VIEW: Record<string, ViewState> = Object.entries(VIEW_TO_PATH).reduce(
@@ -53,8 +53,13 @@ const App: React.FC = () => {
     return PATH_TO_VIEW[path] || 'HOME';
   }, [location.pathname]);
 
-  const setCurrentView = (view: ViewState) => {
-    navigate(VIEW_TO_PATH[view] || '/');
+  const setCurrentView = (view: ViewState, params?: Record<string, string>) => {
+    let path = VIEW_TO_PATH[view] || '/';
+    if (params) {
+      const searchParams = new URLSearchParams(params);
+      path += `?${searchParams.toString()}`;
+    }
+    navigate(path);
   };
 
   // Check for PDF Download Mode
@@ -515,7 +520,7 @@ const App: React.FC = () => {
         <Route path="/download-app.html" element={<DownloadAppView onBack={() => setCurrentView('MENU')} />} />
         <Route path="/emergency-notice.html" element={<EmergencyNoticeDetailView onBack={() => setCurrentView('HOME')} />} />
         <Route path="/gallery.html" element={<GalleryView onBack={() => setCurrentView('MENU')} setView={setCurrentView} />} />
-        <Route path="/gallery-coming-soon.html" element={<GalleryComingSoonView onBack={() => setCurrentView('GALLERY')} />} />
+        <Route path="/gallery-detail.html" element={<GalleryDetailView onBack={() => setCurrentView('GALLERY')} />} />
         <Route path="/gallery-control-room.html" element={<GalleryControlRoomView onBack={() => setCurrentView('GALLERY')} />} />
         
         {/* Fallback */}

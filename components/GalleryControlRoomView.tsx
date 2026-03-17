@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, X, ChevronLeft } from 'lucide-react';
-import { db } from '../firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { supabase } from '../lib/supabaseClient';
 
 interface GalleryControlRoomViewProps {
   onBack: () => void;
@@ -13,41 +12,57 @@ const GalleryControlRoomView: React.FC<GalleryControlRoomViewProps> = ({ onBack 
   const [sliderImages, setSliderImages] = useState<string[]>([]);
 
   useEffect(() => {
-    const q = query(collection(db, 'gallery_categories'), where('bn', '==', 'কন্ট্রোল রুম ও মনিটরিং'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const data = snapshot.docs[0].data();
-        setImages(data.images || []);
-        setSliderImages(data.sliderImages || []);
-      } else {
-        // Fallback to initial images if not found in DB
-        setImages([
-          "https://i.imghippo.com/files/hIAW5391FUU.jpg",
-          "https://i.imghippo.com/files/zuMa8505Yo.jpg",
-          "https://i.imghippo.com/files/hcq1824tg.jpg",
-          "https://i.imghippo.com/files/DZRO1355HgE.jpg",
-          "https://i.imghippo.com/files/GRxk1322XLE.jpg",
-          "https://i.imghippo.com/files/PSPU3951bik.jpg",
-          "https://i.imghippo.com/files/FFis6697ozE.jpg",
-          "https://i.imghippo.com/files/baGA8609t.jpg",
-          "https://i.imghippo.com/files/Xm1093pH.jpg",
-          "https://i.imghippo.com/files/rEHS8514v.jpg",
-          "https://i.imghippo.com/files/aYm9387HEM.jpg",
-          "https://i.imghippo.com/files/Bhf3045brA.jpg"
-        ]);
-        setSliderImages([
-          "https://i.imghippo.com/files/hIAW5391FUU.jpg",
-          "https://i.imghippo.com/files/zuMa8505Yo.jpg",
-          "https://i.imghippo.com/files/hcq1824tg.jpg",
-          "https://i.imghippo.com/files/DZRO1355HgE.jpg",
-          "https://i.imghippo.com/files/GRxk1322XLE.jpg",
-          "https://i.imghippo.com/files/PSPU3951bik.jpg"
-        ]);
-      }
-    });
+    fetchData();
 
-    return () => unsubscribe();
+    const channel = supabase
+      .channel('control_room_changes')
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'gallery_categories',
+        filter: 'bn=eq.কন্ট্রোল রুম ও মনিটরিং'
+      }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
+
+  const fetchData = async () => {
+    const { data, error } = await supabase
+      .from('gallery_categories')
+      .select('images, slider_images')
+      .eq('bn', 'কন্ট্রোল রুম ও মনিটরিং')
+      .single();
+
+    if (error) {
+      console.error('Error fetching control room data:', error);
+      // Fallback
+      setImages([
+        "https://i.imghippo.com/files/hIAW5391FUU.jpg",
+        "https://i.imghippo.com/files/zuMa8505Yo.jpg",
+        "https://i.imghippo.com/files/hcq1824tg.jpg",
+        "https://i.imghippo.com/files/DZRO1355HgE.jpg",
+        "https://i.imghippo.com/files/GRxk1322XLE.jpg",
+        "https://i.imghippo.com/files/PSPU3951bik.jpg",
+        "https://i.imghippo.com/files/FFis6697ozE.jpg",
+        "https://i.imghippo.com/files/baGA8609t.jpg",
+        "https://i.imghippo.com/files/Xm1093pH.jpg",
+        "https://i.imghippo.com/files/rEHS8514v.jpg",
+        "https://i.imghippo.com/files/aYm9387HEM.jpg",
+        "https://i.imghippo.com/files/Bhf3045brA.jpg"
+      ]);
+      return;
+    }
+
+    if (data) {
+      setImages(data.images || []);
+      setSliderImages(data.slider_images || []);
+    }
+  };
 
   const displaySliderImages = sliderImages.length > 0 ? sliderImages : images.slice(0, 6);
 
@@ -133,10 +148,7 @@ const GalleryControlRoomView: React.FC<GalleryControlRoomViewProps> = ({ onBack 
           0% { transform: translateX(0%); }
           ${100 / displaySliderImages.length / 2}% { transform: translateX(0%); }
           ${100 / displaySliderImages.length}% { transform: translateX(-${100 / displaySliderImages.length}%); }
-          /* Dynamic keyframes are hard in static CSS, but this is a simplified version */
         }
-        /* For simplicity, let's stick to a fixed number of slides for the animation if possible, 
-           or use a more robust slider library. But I will keep it simple for now. */
       `}} />
     </div>
   );
