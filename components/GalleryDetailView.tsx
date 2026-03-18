@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, X, Image as ImageIcon, Lock, Unlock, Key, Settings } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, X, Image as ImageIcon, Lock, Unlock, Key, Settings, Edit } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 
@@ -88,42 +88,43 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
     setLoading(false);
   };
 
+  const sliderImages = category?.images && category.images.length > 0 ? category.images : [];
+  const loopSlides = sliderImages.length > 0 ? [...sliderImages, sliderImages[0]] : [];
+
   const handleUpdateImages = async (url: string) => {
     if (!category || !categoryId || !url) return;
     
     const updatedImages = [...(category.images || []), url];
-    const updatedSliderImages = [...(category.slider_images || []), url];
     
-    const { error } = await supabase
-      .from('gallery_categories')
-      .update({ 
-        images: updatedImages,
-        slider_images: updatedSliderImages
-      })
-      .eq('id', categoryId);
-    
-    if (error) alert('Error updating images: ' + error.message);
-    else fetchCategory();
+    try {
+      const { error } = await supabase
+        .from('gallery_categories')
+        .update({ 
+          images: updatedImages
+        })
+        .eq('id', categoryId);
+      
+      if (error) {
+        console.error('Update error:', error);
+        alert('Error updating images: ' + error.message);
+      } else {
+        fetchCategory();
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+    }
   };
 
   const handleEditImage = async (index: number, newUrl: string) => {
     if (!category || !categoryId || !newUrl) return;
     
-    const oldUrl = category.images[index];
     const updatedImages = [...(category.images || [])];
     updatedImages[index] = newUrl;
     
-    const updatedSliderImages = [...(category.slider_images || [])];
-    const sliderIndex = updatedSliderImages.indexOf(oldUrl);
-    if (sliderIndex > -1) {
-      updatedSliderImages[sliderIndex] = newUrl;
-    }
-
     const { error } = await supabase
       .from('gallery_categories')
       .update({ 
-        images: updatedImages,
-        slider_images: updatedSliderImages
+        images: updatedImages
       })
       .eq('id', categoryId);
     
@@ -138,25 +139,35 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
     if (!category || !categoryId) return;
     
     const updatedImages = [...(category.images || [])];
-    const urlToRemove = updatedImages[index];
     updatedImages.splice(index, 1);
     
-    const updatedSliderImages = [...(category.slider_images || [])];
-    const sliderIndex = updatedSliderImages.indexOf(urlToRemove);
-    if (sliderIndex > -1) {
-      updatedSliderImages.splice(sliderIndex, 1);
-    }
-
     const { error } = await supabase
       .from('gallery_categories')
       .update({ 
-        images: updatedImages,
-        slider_images: updatedSliderImages
+        images: updatedImages
       })
       .eq('id', categoryId);
     
     if (error) alert('Error removing image: ' + error.message);
     else fetchCategory();
+  };
+
+  const handleToggleCategoryLock = async () => {
+    if (!category || !categoryId) return;
+    const newLockStatus = !category.is_locked;
+    
+    // Update local state immediately
+    setCategory(prev => prev ? { ...prev, is_locked: newLockStatus } : null);
+
+    const { error } = await supabase
+      .from('gallery_categories')
+      .update({ is_locked: newLockStatus })
+      .eq('id', categoryId);
+    
+    if (error) {
+      alert('Error toggling lock: ' + error.message);
+      fetchCategory(); // Revert on error
+    }
   };
 
   const handleVerifyPin = async () => {
@@ -203,32 +214,44 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
           </button>
           <h1 className="text-lg font-bold text-gray-800 leading-tight">গ্যালারি ভিউ</h1>
         </div>
-        <button 
-          onClick={() => isAdmin ? setIsAdmin(false) : setShowPinModal(true)}
-          className={`p-2 rounded-xl transition-all ${isAdmin ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}
-        >
-          {isAdmin ? <Unlock size={20} /> : <Lock size={20} />}
-        </button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button 
+              onClick={handleToggleCategoryLock}
+              className={`p-2 rounded-xl transition-all ${category.is_locked ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}
+              title={category.is_locked ? "আনলক করুন" : "লক করুন"}
+            >
+              {category.is_locked ? <Lock size={20} /> : <Unlock size={20} />}
+            </button>
+          )}
+          <button 
+            onClick={() => isAdmin ? setIsAdmin(false) : setShowPinModal(true)}
+            className={`p-2 rounded-xl transition-all ${isAdmin ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
+          >
+            {isAdmin ? <Settings size={20} /> : <Key size={20} />}
+          </button>
+        </div>
       </div>
 
       {/* Slider Section */}
-      {mainSliderImages.length > 0 && (
-        <div className="max-w-[900px] mx-auto mt-[30px] relative overflow-hidden rounded-[10px] shadow-[0_0_15px_rgba(0,0,0,0.3)] bg-white">
+      {loopSlides.length > 0 && (
+        <div className="max-w-[700px] mx-auto mt-[20px] relative overflow-hidden rounded-[10px] shadow-[0_0_10px_rgba(0,0,0,0.2)] bg-white">
           <div 
             className="flex w-full" 
             style={{ 
-              animation: `slide ${mainSliderImages.length * 4}s infinite`,
+              animation: `gallerySlide ${loopSlides.length * 4}s infinite`,
               display: 'flex',
-              width: `${mainSliderImages.length * 100}%`
+              width: `${loopSlides.length * 100}%`
             }}
           >
-            {mainSliderImages.map((src, idx) => (
+            {loopSlides.map((src, idx) => (
               <img 
                 key={idx} 
                 src={src} 
-                style={{ width: `${100 / mainSliderImages.length}%` }}
-                className="height-auto flex-shrink-0 object-contain" 
+                style={{ width: `${100 / loopSlides.length}%` }}
+                className="height-auto flex-shrink-0 object-contain cursor-pointer" 
                 alt="" 
+                onClick={() => setFullscreenImage(src)}
               />
             ))}
           </div>
@@ -236,13 +259,13 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
       )}
 
       {/* Header Title */}
-      <div className="bg-[#3b5998] text-white text-center p-[20px_10px] text-[24px] font-bold mt-[20px] max-w-[900px] mx-auto rounded-lg shadow-md">
+      <div className="bg-[#3b5998] text-white text-center p-[12px_10px] text-[18px] font-bold mt-[15px] max-w-[700px] mx-auto shadow-md">
         {category.bn} ({category.en})
       </div>
 
       {/* Admin Panel */}
       {isAdmin && (
-        <div className="max-w-[900px] mx-auto m-4 p-5 bg-white rounded-3xl shadow-md border border-blue-100 space-y-4">
+        <div className="max-w-[700px] mx-auto m-4 p-5 bg-white rounded-3xl shadow-md border border-blue-100 space-y-4">
           <h3 className="font-bold text-gray-800 flex items-center gap-2">
             <Plus size={20} className="text-blue-600" /> নতুন ছবি যোগ করুন
           </h3>
@@ -317,7 +340,7 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
       )}
 
       {/* Gallery List */}
-      <div className="max-w-[900px] mx-auto my-[20px] p-[10px] flex flex-col gap-[20px]">
+      <div className="max-w-[700px] mx-auto my-[12px] p-[10px] flex flex-col gap-[12px]">
         {(!category.images || category.images.length === 0) ? (
           <div className="bg-white rounded-3xl p-10 text-center border-2 border-dashed border-gray-200">
             <ImageIcon size={48} className="text-gray-300 mx-auto mb-3" />
@@ -325,7 +348,7 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
           </div>
         ) : (
           category.images.map((url, idx) => (
-            <div key={idx} className="relative w-full rounded-[8px] overflow-hidden shadow-[0_0_10px_rgba(0,0,0,0.2)] bg-white">
+            <div key={idx} className="relative w-full rounded-[8px] overflow-hidden shadow-[0_0_6px_rgba(0,0,0,0.12)] bg-white group">
               <img 
                 src={url} 
                 className="w-full h-auto cursor-pointer hover:scale-[1.01] transition-transform duration-300" 
@@ -333,20 +356,20 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
                 onClick={() => setFullscreenImage(url)}
               />
               {isAdmin && (
-                <div className="absolute top-2 right-2 flex gap-2">
+                <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
                     onClick={() => {
                       setEditingUrlIndex(idx);
                       setEditingUrlValue(url);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="p-2 bg-blue-600 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="p-2 bg-white/90 text-blue-600 rounded-lg shadow-lg hover:bg-white"
                   >
-                    <Settings size={14} />
+                    <Edit size={14} />
                   </button>
                   <button 
                     onClick={() => handleRemoveImage(idx)}
-                    className="p-2 bg-red-600 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="p-2 bg-white/90 text-red-600 rounded-lg shadow-lg hover:bg-white"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -407,17 +430,20 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
         </div>
       )}
 
-      <style>{`
-        @keyframes slide {
-          0% { transform: translateX(0%); }
-          16.66% { transform: translateX(-100%); }
-          33.33% { transform: translateX(-200%); }
-          50% { transform: translateX(-300%); }
-          66.66% { transform: translateX(-400%); }
-          83.33% { transform: translateX(-500%); }
-          100% { transform: translateX(0%); }
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes gallerySlide {
+          ${loopSlides.length > 1 ? loopSlides.map((_, i) => {
+            const step = 100 / (loopSlides.length - 1);
+            const start = i * step;
+            const pause = start + (step * 0.8);
+            return `
+              ${start}% { transform: translateX(-${i * 100 / loopSlides.length}%); }
+              ${pause}% { transform: translateX(-${i * 100 / loopSlides.length}%); }
+            `;
+          }).join('') : '0% { transform: translateX(0%); } 100% { transform: translateX(0%); }'}
+          100% { transform: translateX(-${loopSlides.length > 1 ? (loopSlides.length - 1) * 100 / loopSlides.length : 0}%); }
         }
-      `}</style>
+      `}} />
     </div>
   );
 };

@@ -25,6 +25,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
   const [pinInput, setPinInput] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<GalleryCategory | null>(null);
   const [newCategory, setNewCategory] = useState({ bn: '', en: '', icon: 'fa-images' });
   const [pin, setPin] = useState('1234');
@@ -176,35 +177,52 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (window.confirm('আপনি কি নিশ্চিত যে এই ক্যাটাগরি মুছে ফেলতে চান?')) {
-      try {
-        const { error } = await supabase
-          .from('gallery_categories')
-          .delete()
-          .match({ id });
-        
-        if (error) {
-          console.error('Delete error:', error);
-          alert('Error deleting category: ' + error.message);
-        } else {
-          // Manually update state to ensure immediate UI feedback
-          setCategories(prev => prev.filter(cat => cat.id !== id));
-          alert('ক্যাটাগরি সফলভাবে মুছে ফেলা হয়েছে।');
-        }
-      } catch (err) {
-        console.error('Unexpected error during delete:', err);
-      }
+    const category = categories.find(cat => cat.id === id);
+    if (category?.is_locked) {
+      alert('এই ক্যাটাগরি লক করা আছে। ডিলিট করতে হলে প্রথমে আনলক করুন।');
+      return;
+    }
+    
+    setShowDeleteConfirm(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!showDeleteConfirm) return;
+    
+    const { error } = await supabase
+      .from('gallery_categories')
+      .delete()
+      .eq('id', showDeleteConfirm);
+    
+    if (error) {
+      console.error('Delete error:', error);
+      alert('Error deleting category: ' + error.message);
+    } else {
+      setCategories(prev => prev.filter(cat => cat.id !== showDeleteConfirm));
+      setShowDeleteConfirm(null);
     }
   };
 
   const handleToggleLock = async (category: GalleryCategory) => {
+    const newLockStatus = !category.is_locked;
+    
+    // Update local state immediately for responsiveness
+    setCategories(prev => prev.map(cat => 
+      cat.id === category.id ? { ...cat, is_locked: newLockStatus } : cat
+    ));
+
     const { error } = await supabase
       .from('gallery_categories')
-      .update({ is_locked: !category.is_locked })
+      .update({ is_locked: newLockStatus })
       .eq('id', category.id);
     
-    if (error) alert('Error toggling lock: ' + error.message);
-    else fetchCategories();
+    if (error) {
+      alert('Error toggling lock: ' + error.message);
+      // Revert local state on error
+      setCategories(prev => prev.map(cat => 
+        cat.id === category.id ? { ...cat, is_locked: !newLockStatus } : cat
+      ));
+    }
   };
 
   const handleUpdateCategory = async () => {
@@ -260,6 +278,8 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
 
   // Use mainSliderImages for display
   const displaySlides = mainSliderImages.length > 0 ? mainSliderImages : defaultSlides;
+  // Add first slide at the end for smooth looping
+  const loopSlides = [...displaySlides, displaySlides[0]];
 
   return (
     <div className="min-h-screen bg-[#f5f7ff] pb-24">
@@ -284,16 +304,16 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
         <div 
           className="flex w-full" 
           style={{ 
-            animation: `slide ${displaySlides.length * 4}s infinite`,
+            animation: `slide ${loopSlides.length * 4}s infinite`,
             display: 'flex',
-            width: `${displaySlides.length * 100}%`
+            width: `${loopSlides.length * 100}%`
           }}
         >
-          {displaySlides.map((src, index) => (
+          {loopSlides.map((src, index) => (
             <img 
               key={index} 
               src={src} 
-              style={{ width: `${100 / displaySlides.length}%` }}
+              style={{ width: `${100 / loopSlides.length}%` }}
               onClick={() => setFullscreenImage(src)}
               className="height-auto flex-shrink-0 object-contain cursor-pointer" 
               alt={`Slide ${index + 1}`}
@@ -330,11 +350,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
                     if (cat.is_locked && !isAdmin) {
                       alert('এই ক্যাটাগরি লক করা আছে।');
                     } else {
-                      if (cat.bn === "কন্ট্রোল রুম ও মনিটরিং") {
-                        setView('GALLERY_CONTROL_ROOM');
-                      } else {
-                        setView('GALLERY_DETAIL', { id: cat.id, admin: isAdmin ? 'true' : 'false' });
-                      }
+                      setView('GALLERY_DETAIL', { id: cat.id, admin: isAdmin ? 'true' : 'false' });
                     }
                   }}
                   className="w-full bg-gradient-to-br from-[#4a69bd] to-[#6a82fb] rounded-[15px] p-[12px_20px] min-h-[70px] text-white shadow-[0_5px_20px_rgba(74,105,189,0.4)] transition-all duration-300 flex items-center gap-[18px] hover:from-[#6a82fb] hover:to-[#4a69bd] hover:-translate-y-1 hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(74,105,189,0.6)]"
@@ -569,15 +585,45 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl text-center">
+            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={32} />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">আপনি কি নিশ্চিত?</h2>
+            <p className="text-gray-500 mb-6">এই ক্যাটাগরি মুছে ফেললে এর সব ছবিও ডিলিট হয়ে যাবে।</p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowDeleteConfirm(null)}
+                className="flex-1 p-3 rounded-xl font-bold text-gray-500 bg-gray-100 hover:bg-gray-200"
+              >
+                বাতিল
+              </button>
+              <button 
+                onClick={confirmDelete}
+                className="flex-1 p-3 bg-red-600 text-white rounded-xl font-bold shadow-lg hover:bg-red-700"
+              >
+                ডিলিট করুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes slide {
-          0% { transform: translateX(0%); }
-          16.66% { transform: translateX(-100%); }
-          33.33% { transform: translateX(-200%); }
-          50% { transform: translateX(-300%); }
-          66.66% { transform: translateX(-400%); }
-          83.33% { transform: translateX(-500%); }
-          100% { transform: translateX(0%); }
+          ${loopSlides.length > 1 ? loopSlides.map((_, i) => {
+            const step = 100 / (loopSlides.length - 1);
+            const start = i * step;
+            const pause = start + (step * 0.8); // 80% pause, 20% slide
+            return `
+              ${start}% { transform: translateX(-${i * 100 / loopSlides.length}%); }
+              ${pause}% { transform: translateX(-${i * 100 / loopSlides.length}%); }
+            `;
+          }).join('') : '0% { transform: translateX(0%); } 100% { transform: translateX(0%); }'}
+          100% { transform: translateX(-${loopSlides.length > 1 ? (loopSlides.length - 1) * 100 / loopSlides.length : 0}%); }
         }
       `}} />
     </div>
