@@ -736,12 +736,12 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
 
           {/* Video List Section */}
           {category.images && category.images.some(url => url.includes('drive.google.com')) && (
-            <div className="max-w-[700px] mx-auto my-8 p-4 space-y-6">
+            <div className="w-full max-w-[700px] mx-auto my-8 p-[10px] space-y-6">
               <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
                 <Video size={24} className="text-blue-600" />
                 <h3 className="text-xl font-bold text-gray-800">ভিডিও গ্যালারি</h3>
               </div>
-              <div className="grid grid-cols-1 gap-6">
+              <div className="flex flex-col gap-6">
                 {category.images.filter(url => url.includes('drive.google.com')).map((url, idx) => (
                   <div key={idx} className="bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-100">
                     <div 
