@@ -29,7 +29,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<GalleryCategory | null>(null);
   const [newCategory, setNewCategory] = useState({ bn: '', en: '', icon: 'fa-images' });
-  const [pin, setPin] = useState('1234');
+  const [pin, setPin] = useState('1966');
   const [mainSliderImages, setMainSliderImages] = useState<string[]>([]);
   const [editingSliderIndex, setEditingSliderIndex] = useState<number | null>(null);
   const [editingSliderValue, setEditingSliderValue] = useState('');
@@ -146,7 +146,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
       if (error.code === 'PGRST116') { // Not found
         await supabase.from('gallery_settings').insert([{ 
           id: 'config', 
-          pin: '1234',
+          pin: '1966',
           main_slider_images: [
             "https://i.imghippo.com/files/IxR3498AKE.png",
             "https://i.imghippo.com/files/VN1922RL.jpg",
@@ -161,7 +161,12 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
     }
 
     if (data) {
-      setPin(data.pin);
+      if (data.pin === '1234') {
+        await supabase.from('gallery_settings').update({ pin: '1966' }).eq('id', 'config');
+        setPin('1966');
+      } else {
+        setPin(data.pin);
+      }
       setMainSliderImages(data.main_slider_images || []);
     }
   };
@@ -320,7 +325,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
           onClick={() => isAdmin ? setShowAdminModal(true) : setShowPinModal(true)}
           className={`p-2 rounded-full transition-all ${isAdmin ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}
         >
-          {isAdmin ? <Settings size={24} /> : <Lock size={24} />}
+          {isAdmin ? <Settings size={24} /> : <Lock size={24} className="opacity-50" />}
         </button>
       </div>
 
@@ -352,7 +357,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
         <div className="flex items-center justify-between mb-[30px] px-4">
           <div className="flex-1"></div>
           <h2 className="text-[22px] text-[#1a2e45] font-bold leading-[1.2]">
-            হলান টাওয়ার এক নজরে (Holan Tower at a Glance)
+            হলান টাওয়ার এক নজরে <span className="text-[16px] font-medium opacity-80 whitespace-nowrap ml-1">(Holan Tower at a Glance)</span>
           </h2>
           <div className="flex-1 flex justify-end">
             {isAdmin && (
@@ -372,11 +377,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
               <div className="flex flex-col gap-2">
                 <button 
                   onClick={() => {
-                    if (cat.is_locked && !isAdmin) {
-                      alert('এই ক্যাটাগরি লক করা আছে।');
-                    } else {
-                      setView('GALLERY_DETAIL', { id: cat.id, admin: isAdmin ? 'true' : 'false' });
-                    }
+                    setView('GALLERY_DETAIL', { id: cat.id, admin: isAdmin ? 'true' : 'false' });
                   }}
                   className="w-full bg-gradient-to-br from-[#4a69bd] to-[#6a82fb] rounded-[15px] p-[12px_20px] min-h-[70px] text-white shadow-[0_5px_20px_rgba(74,105,189,0.4)] transition-all duration-300 flex items-center gap-[18px] hover:from-[#6a82fb] hover:to-[#4a69bd] hover:-translate-y-1 hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(74,105,189,0.6)]"
                 >
@@ -385,7 +386,11 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
                     <div className="text-[18px] font-bold leading-[1.1]">{cat.bn}</div>
                     <div className="text-[14px] opacity-[0.85] mt-[3px]">({cat.en})</div>
                   </div>
-                  {cat.is_locked && <Lock size={20} className="text-red-200" />}
+                  {isAdmin && (
+                    <div className="opacity-40 flex-shrink-0">
+                      {cat.is_locked ? <Lock size={18} /> : <Unlock size={18} />}
+                    </div>
+                  )}
                 </button>
 
                 {isAdmin && (
@@ -430,7 +435,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
           <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl">
             <div className="flex flex-col items-center gap-4">
               <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
-                <Lock size={32} />
+                <Lock size={32} className="opacity-50" />
               </div>
               <h2 className="text-2xl font-bold text-gray-800">অ্যাডমিন পিন</h2>
               <input 

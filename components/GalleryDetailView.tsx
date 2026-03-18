@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, X, Lock, Unlock, Key, Settings, Edit, Video, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, X, Lock, Unlock, Settings, Edit, Video, ChevronRight } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { ViewState } from '../types';
@@ -431,7 +431,7 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
             className={`p-2 rounded-xl transition-all ${isAdmin ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
             title={isAdmin ? "লক করুন" : "এডিট মোড আনলক করুন"}
           >
-            {isAdmin ? <Settings size={20} /> : <Key size={20} />}
+            {isAdmin ? <Unlock size={20} className="opacity-50" /> : <Lock size={20} className="opacity-50" />}
           </button>
         </div>
       </div>
@@ -486,10 +486,12 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
                           {event.bn}
                         </span>
                         <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium mt-1">
-                          {event.is_locked ? (
-                            <Lock size={10} className="text-red-300 flex-shrink-0 opacity-70" />
-                          ) : (
-                            <Unlock size={10} className="text-green-300 flex-shrink-0 opacity-70" />
+                          {isAdmin && (
+                            event.is_locked ? (
+                              <Lock size={10} className="text-red-300 flex-shrink-0 opacity-70" />
+                            ) : (
+                              <Unlock size={10} className="text-green-300 flex-shrink-0 opacity-70" />
+                            )
                           )}
                           <span>ইভেন্ট বিস্তারিত দেখুন</span>
                         </div>
@@ -509,13 +511,15 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
                         >
                           <Edit size={16} />
                         </button>
-                        <button 
-                          onClick={() => handleDeleteSubEvent(event.id)}
-                          className="px-3.5 text-red-400 hover:text-red-600 hover:bg-red-50 transition-all flex items-center justify-center"
-                          title="ডিলিট করুন"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {!event.is_locked && (
+                          <button 
+                            onClick={() => handleDeleteSubEvent(event.id)}
+                            className="px-3.5 text-red-400 hover:text-red-600 hover:bg-red-50 transition-all flex items-center justify-center"
+                            title="ডিলিট করুন"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -905,7 +909,7 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
           <div className="bg-white w-full max-w-xs rounded-3xl overflow-hidden shadow-2xl p-6">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Key size={32} />
+                <Lock size={32} className="opacity-50" />
               </div>
               <h3 className="text-xl font-bold text-gray-800">অ্যাডমিন পিন</h3>
               <p className="text-sm text-gray-500">ছবি এডিট করতে ৪ ডিজিটের পিন দিন</p>
