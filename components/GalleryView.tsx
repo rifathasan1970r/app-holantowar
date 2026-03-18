@@ -11,6 +11,7 @@ interface GalleryCategory {
   is_locked: boolean;
   images: string[];
   slider_images: string[];
+  videos?: string[];
   created_at?: string;
 }
 
@@ -45,6 +46,17 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
     { bn: "ইভেন্ট ও গেট টুগেদার", en: "Events & Gatherings", icon: "fa-calendar-check" }
   ];
 
+  const categoryOrder = [
+    "বিল্ডিং বহির্ভাগ",
+    "গাড়ি পার্কিং",
+    "কন্ট্রোল রুম ও মনিটরিং",
+    "সিঁড়ির দৃশ্য",
+    "ফ্ল্যাট অভ্যন্তরীণ দৃশ্য",
+    "ছাদের দৃশ্য",
+    "কমিউনিটি হল রুম",
+    "ইভেন্ট ও গেট টুগেদার"
+  ];
+
   useEffect(() => {
     fetchCategories();
     fetchSettings();
@@ -74,12 +86,15 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
     }
 
     if (data) {
+      // Filter out sub-events (categories that start with SUB_EVENT:)
+      const mainCategories = data.filter(cat => !cat.en.startsWith('SUB_EVENT:'));
+      
       // Check for duplicates and remove them if found (keep the first one)
       const uniqueCategories: GalleryCategory[] = [];
       const seenNames = new Set();
       const duplicateIds: string[] = [];
 
-      data.forEach(cat => {
+      mainCategories.forEach(cat => {
         if (seenNames.has(cat.bn)) {
           duplicateIds.push(cat.id);
         } else {
@@ -95,7 +110,17 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
         return;
       }
 
-      setCategories(uniqueCategories);
+      // Sort categories by the requested order
+      const sorted = [...uniqueCategories].sort((a, b) => {
+        const indexA = categoryOrder.indexOf(a.bn);
+        const indexB = categoryOrder.indexOf(b.bn);
+        if (indexA === -1 && indexB === -1) return 0;
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      });
+
+      setCategories(sorted);
       
       // If database is empty, seed initial categories
       if (uniqueCategories.length === 0) {
@@ -383,12 +408,14 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
                     >
                       <Settings size={16} /> নাম এডিট
                     </button>
-                    <button 
-                      onClick={() => handleDeleteCategory(cat.id)}
-                      className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {!cat.is_locked && (
+                      <button 
+                        onClick={() => handleDeleteCategory(cat.id)}
+                        className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

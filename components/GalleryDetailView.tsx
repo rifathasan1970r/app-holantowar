@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, X, Image as ImageIcon, Lock, Unlock, Key, Settings, Edit } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, X, Image as ImageIcon, Lock, Unlock, Key, Settings, Edit, Video } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { ViewState } from '../types';
 
 interface GalleryCategory {
   id: string;
@@ -11,13 +12,15 @@ interface GalleryCategory {
   is_locked: boolean;
   images: string[];
   slider_images: string[];
+  videos?: string[];
 }
 
 interface GalleryDetailViewProps {
   onBack: () => void;
+  setView?: (view: ViewState, params?: Record<string, string>) => void;
 }
 
-const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
+const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }) => {
   const location = useLocation();
   const [category, setCategory] = useState<GalleryCategory | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,7 +30,12 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [editingUrlIndex, setEditingUrlIndex] = useState<number | null>(null);
   const [editingUrlValue, setEditingUrlValue] = useState('');
+  const [editingVideoIndex, setEditingVideoIndex] = useState<number | null>(null);
+  const [editingVideoValue, setEditingVideoValue] = useState('');
   const [mainSliderImages, setMainSliderImages] = useState<string[]>([]);
+  const [subEvents, setSubEvents] = useState<GalleryCategory[]>([]);
+  const [showAddEventModal, setShowAddEventModal] = useState(false);
+  const [newEvent, setNewEvent] = useState({ bn: '', date: '' });
 
   const categoryId = new URLSearchParams(location.search).get('id');
   const isAdminParam = new URLSearchParams(location.search).get('admin');
@@ -48,8 +56,7 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
         .on('postgres_changes', { 
           event: '*', 
           schema: 'public', 
-          table: 'gallery_categories',
-          filter: `id=eq.${categoryId}`
+          table: 'gallery_categories'
         }, () => {
           fetchCategory();
         })
@@ -84,16 +91,113 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
       console.error('Error fetching category:', error);
     } else {
       setCategory(data);
+      if (data.en === 'Events & Gatherings') {
+        fetchSubEvents(data.id);
+      }
     }
     setLoading(false);
   };
 
-  const sliderImages = category?.images && category.images.length > 0 ? category.images : [];
+  const fetchSubEvents = async (parentId: string) => {
+    const { data, error } = await supabase
+      .from('gallery_categories')
+      .select('*')
+      .filter('en', 'like', `SUB_EVENT:${parentId}:%`)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching sub-events:', error);
+    } else {
+      setSubEvents(data || []);
+    }
+  };
+
+  const handleBack = () => {
+    if (category?.en.startsWith('SUB_EVENT:')) {
+      const parentId = category.en.split(':')[1];
+      if (setView) {
+        setView('GALLERY_DETAIL', { id: parentId, admin: isAdmin ? 'true' : 'false' });
+      } else {
+        onBack();
+      }
+    } else {
+      onBack();
+    }
+  };
+
+  const handleAddSubEvent = async () => {
+    if (!category || !newEvent.bn || !newEvent.date) return;
+
+    const subEventData = {
+      bn: newEvent.bn,
+      en: `SUB_EVENT:${category.id}:${newEvent.date}`,
+      icon: 'fa-calendar-alt',
+      is_locked: false,
+      images: [],
+      slider_images: []
+    };
+
+    const { error } = await supabase
+      .from('gallery_categories')
+      .insert(subEventData);
+
+    if (error) {
+      alert('Error adding event: ' + error.message);
+    } else {
+      setShowAddEventModal(false);
+      setNewEvent({ bn: '', date: '' });
+      fetchSubEvents(category.id);
+    }
+  };
+
+  const handleDeleteSubEvent = async (id: string) => {
+    if (!window.confirm('আপনি কি নিশ্চিত যে আপনি এই ইভেন্টটি ডিলিট করতে চান?')) return;
+
+    const { error } = await supabase
+      .from('gallery_categories')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      alert('Error deleting event: ' + error.message);
+    } else {
+      if (category) fetchSubEvents(category.id);
+    }
+  };
+
+  const getEmbedUrl = (url: string) => {
+    // Remove hash for embedding
+    const cleanUrl = url.split('#')[0];
+    if (cleanUrl.includes('drive.google.com')) {
+      const driveMatch = cleanUrl.match(/\/file\/d\/([^\/]+)/);
+      if (driveMatch && driveMatch[1]) {
+        return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+      }
+    }
+    return cleanUrl;
+  };
+
+  const getVideoRatio = (url: string) => {
+    if (url.includes('#ratio=')) {
+      return url.split('#ratio=')[1];
+    }
+    return '16/9'; // Default
+  };
+
+  const sliderImages = category?.images && category.images.length > 0 
+    ? category.images.filter(url => !url.includes('drive.google.com')) 
+    : [];
   const loopSlides = sliderImages.length > 0 ? [...sliderImages, sliderImages[0]] : [];
 
   const handleUpdateImages = async (url: string) => {
     if (!category || !categoryId || !url) return;
     
+    // Ensure it's not a drive link being added as an image if we want them separate
+    if (url.includes('drive.google.com')) {
+      alert('এটি একটি ভিডিও লিংক। দয়া করে ভিডিও সেকশনে যোগ করুন।');
+      return;
+    }
+
     const updatedImages = [...(category.images || []), url];
     
     try {
@@ -150,6 +254,78 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
     
     if (error) alert('Error removing image: ' + error.message);
     else fetchCategory();
+  };
+
+  const handleUpdateVideos = async (url: string) => {
+    if (!category || !categoryId || !url) return;
+    
+    // We use the 'images' column to store both images and videos
+    // Video links are identified by 'drive.google.com'
+    const updatedImages = [...(category.images || []), url];
+    
+    try {
+      const { error } = await supabase
+        .from('gallery_categories')
+        .update({ 
+          images: updatedImages
+        })
+        .eq('id', categoryId);
+      
+      if (error) {
+        console.error('Update error:', error);
+        alert('Error updating videos: ' + error.message);
+      } else {
+        fetchCategory();
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+    }
+  };
+
+  const handleEditVideo = async (index: number, newUrl: string) => {
+    if (!category || !categoryId || !newUrl) return;
+    
+    // Get all drive links to find the correct one to edit
+    const driveLinks = category.images.filter(url => url.includes('drive.google.com'));
+    const targetUrl = driveLinks[index];
+    const actualIndex = category.images.indexOf(targetUrl);
+    
+    if (actualIndex !== -1) {
+      const updatedImages = [...category.images];
+      updatedImages[actualIndex] = newUrl;
+      
+      const { error } = await supabase
+        .from('gallery_categories')
+        .update({ images: updatedImages })
+        .eq('id', categoryId);
+      
+      if (error) alert('Error editing video: ' + error.message);
+      else {
+        setEditingVideoIndex(null);
+        fetchCategory();
+      }
+    }
+  };
+
+  const handleRemoveVideo = async (index: number) => {
+    if (!category || !categoryId) return;
+    
+    const driveLinks = category.images.filter(url => url.includes('drive.google.com'));
+    const targetUrl = driveLinks[index];
+    const actualIndex = category.images.indexOf(targetUrl);
+    
+    if (actualIndex !== -1) {
+      const updatedImages = [...category.images];
+      updatedImages.splice(actualIndex, 1);
+      
+      const { error } = await supabase
+        .from('gallery_categories')
+        .update({ images: updatedImages })
+        .eq('id', categoryId);
+      
+      if (error) alert('Error removing video: ' + error.message);
+      else fetchCategory();
+    }
   };
 
   const handleToggleCategoryLock = async () => {
@@ -209,13 +385,15 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
       {/* Header */}
       <div className="bg-white p-4 flex items-center justify-between shadow-sm sticky top-0 z-30">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full">
+          <button onClick={handleBack} className="p-2 hover:bg-gray-100 rounded-full">
             <ArrowLeft size={24} className="text-gray-600" />
           </button>
-          <h1 className="text-lg font-bold text-gray-800 leading-tight">গ্যালারি ভিউ</h1>
+          <h1 className="text-lg font-bold text-gray-800 leading-tight">
+            {category.en.startsWith('SUB_EVENT:') ? 'ইভেন্ট গ্যালারি' : 'গ্যালারি ভিউ'}
+          </h1>
         </div>
         <div className="flex items-center gap-2">
-          {isAdmin && (
+          {isAdmin && !category.en.startsWith('SUB_EVENT:') && (
             <button 
               onClick={handleToggleCategoryLock}
               className={`p-2 rounded-xl transition-all ${category.is_locked ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}
@@ -233,152 +411,386 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* Slider Section */}
-      {loopSlides.length > 0 && (
-        <div className="max-w-[700px] mx-auto mt-[20px] relative overflow-hidden rounded-[10px] shadow-[0_0_10px_rgba(0,0,0,0.2)] bg-white">
-          <div 
-            className="flex w-full" 
-            style={{ 
-              animation: `gallerySlide ${loopSlides.length * 4}s infinite`,
-              display: 'flex',
-              width: `${loopSlides.length * 100}%`
-            }}
-          >
-            {loopSlides.map((src, idx) => (
-              <img 
-                key={idx} 
-                src={src} 
-                style={{ width: `${100 / loopSlides.length}%` }}
-                className="height-auto flex-shrink-0 object-contain cursor-pointer" 
-                alt="" 
-                onClick={() => setFullscreenImage(src)}
-              />
-            ))}
+      {category.en === 'Events & Gatherings' ? (
+        /* Events List View */
+        <div className="max-w-[700px] mx-auto p-4 space-y-4">
+          <div className="bg-[#3b5998] text-white text-center p-[12px_10px] text-[18px] font-bold rounded-xl shadow-md mb-6">
+            {category.bn} ({category.en})
           </div>
-        </div>
-      )}
 
-      {/* Header Title */}
-      <div className="bg-[#3b5998] text-white text-center p-[12px_10px] text-[18px] font-bold mt-[15px] max-w-[700px] mx-auto shadow-md">
-        {category.bn} ({category.en})
-      </div>
-
-      {/* Admin Panel */}
-      {isAdmin && (
-        <div className="max-w-[700px] mx-auto m-4 p-5 bg-white rounded-3xl shadow-md border border-blue-100 space-y-4">
-          <h3 className="font-bold text-gray-800 flex items-center gap-2">
-            <Plus size={20} className="text-blue-600" /> নতুন ছবি যোগ করুন
-          </h3>
-          <div className="flex gap-2">
-            <input 
-              id="new-img-url" 
-              placeholder="ইমেজ URL দিন" 
-              className="flex-1 p-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
-            />
+          {isAdmin && (
             <button 
-              onClick={() => {
-                const input = document.getElementById('new-img-url') as HTMLInputElement;
-                if (input.value) {
-                  handleUpdateImages(input.value);
-                  input.value = '';
-                }
-              }}
-              className="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold text-sm"
+              onClick={() => setShowAddEventModal(true)}
+              className="w-full bg-blue-600 text-white p-4 rounded-2xl flex items-center justify-center gap-2 font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95"
             >
-              যোগ করুন
+              <Plus size={20} /> নতুন ইভেন্ট যোগ করুন
             </button>
-          </div>
+          )}
 
-          <div className="mt-6 space-y-3">
-            <h4 className="font-bold text-gray-700 text-sm border-b pb-2">বর্তমান ছবিগুলোর URL (এডিট/ডিলিট)</h4>
-            {category.images?.map((url, idx) => (
-              <div key={idx} className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-100">
-                {editingUrlIndex === idx ? (
-                  <>
-                    <input 
-                      value={editingUrlValue}
-                      onChange={(e) => setEditingUrlValue(e.target.value)}
-                      className="flex-1 p-2 text-xs border rounded-lg outline-none focus:border-blue-500"
-                    />
-                    <button 
-                      onClick={() => handleEditImage(idx, editingUrlValue)}
-                      className="p-2 bg-green-600 text-white rounded-lg"
-                    >
-                      সেভ
-                    </button>
-                    <button 
-                      onClick={() => setEditingUrlIndex(null)}
-                      className="p-2 bg-gray-400 text-white rounded-lg"
-                    >
-                      <X size={14} />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex-1 text-[10px] text-gray-500 truncate">{url}</div>
+          <div className="space-y-3">
+            {subEvents.length === 0 ? (
+              <div className="bg-white rounded-3xl p-10 text-center border-2 border-dashed border-gray-200">
+                <ImageIcon size={48} className="text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 font-medium">কোনো ইভেন্ট পাওয়া যায়নি</p>
+              </div>
+            ) : (
+              subEvents.map((event) => {
+                const eventDate = event.en.split(':')[2];
+                return (
+                  <div key={event.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex items-stretch">
                     <button 
                       onClick={() => {
-                        setEditingUrlIndex(idx);
-                        setEditingUrlValue(url);
+                        if (setView) {
+                          setView('GALLERY_DETAIL', { id: event.id, admin: isAdmin ? 'true' : 'false' });
+                        } else {
+                          window.location.search = `?id=${event.id}&admin=${isAdmin ? 'true' : 'false'}`;
+                        }
                       }}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                      className="flex-1 p-4 flex flex-col items-start gap-1 hover:bg-gray-50 transition-colors text-left"
                     >
-                      এডিট
+                      <span className="text-blue-600 font-bold text-sm">{eventDate}</span>
+                      <span className="text-gray-800 font-bold text-lg">{event.bn}</span>
                     </button>
-                    <button 
-                      onClick={() => handleRemoveImage(idx)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </>
-                )}
+                    {isAdmin && (
+                      <button 
+                        onClick={() => handleDeleteSubEvent(event.id)}
+                        className="p-4 text-red-500 hover:bg-red-50 transition-colors border-l border-gray-100"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Standard Gallery View */
+        <>
+          {/* Slider Section */}
+          {loopSlides.length > 0 && (
+            <div className="max-w-[700px] mx-auto mt-[20px] relative overflow-hidden rounded-[10px] shadow-[0_0_10px_rgba(0,0,0,0.2)] bg-white">
+              <div 
+                className="flex w-full" 
+                style={{ 
+                  animation: `gallerySlide ${loopSlides.length * 4}s infinite`,
+                  display: 'flex',
+                  width: `${loopSlides.length * 100}%`
+                }}
+              >
+                {loopSlides.map((src, idx) => (
+                  <img 
+                    key={idx} 
+                    src={src} 
+                    style={{ width: `${100 / loopSlides.length}%` }}
+                    className="height-auto flex-shrink-0 object-contain cursor-pointer" 
+                    alt="" 
+                    onClick={() => setFullscreenImage(src)}
+                  />
+                ))}
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Header Title */}
+          <div className="bg-[#3b5998] text-white text-center p-[12px_10px] text-[18px] font-bold mt-[15px] max-w-[700px] mx-auto shadow-md">
+            {category.bn} {category.en.startsWith('SUB_EVENT:') ? `(${category.en.split(':')[2]})` : `(${category.en})`}
+          </div>
+
+          {/* Admin Panel */}
+          {isAdmin && (
+            <div className="max-w-[700px] mx-auto m-4 p-5 bg-white rounded-3xl shadow-md border border-blue-100 space-y-4">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                <Plus size={20} className="text-blue-600" /> নতুন ছবি যোগ করুন
+              </h3>
+              <div className="flex gap-2">
+                <input 
+                  id="new-img-url" 
+                  placeholder="ইমেজ URL দিন" 
+                  className="flex-1 p-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                />
+                <button 
+                  onClick={() => {
+                    const input = document.getElementById('new-img-url') as HTMLInputElement;
+                    if (input.value) {
+                      handleUpdateImages(input.value);
+                      input.value = '';
+                    }
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold text-sm"
+                >
+                  যোগ করুন
+                </button>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                <h4 className="font-bold text-gray-700 text-sm border-b pb-2">বর্তমান ছবিগুলোর URL (এডিট/ডিলিট)</h4>
+                {category.images?.map((url, idx) => (
+                  <div key={idx} className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-100">
+                    {editingUrlIndex === idx ? (
+                      <>
+                        <input 
+                          value={editingUrlValue}
+                          onChange={(e) => setEditingUrlValue(e.target.value)}
+                          className="flex-1 p-2 text-xs border rounded-lg outline-none focus:border-blue-500"
+                        />
+                        <button 
+                          onClick={() => handleEditImage(idx, editingUrlValue)}
+                          className="p-2 bg-green-600 text-white rounded-lg"
+                        >
+                          সেভ
+                        </button>
+                        <button 
+                          onClick={() => setEditingUrlIndex(null)}
+                          className="p-2 bg-gray-400 text-white rounded-lg"
+                        >
+                          <X size={14} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex-1 text-[10px] text-gray-500 truncate">{url}</div>
+                        <button 
+                          onClick={() => {
+                            setEditingUrlIndex(idx);
+                            setEditingUrlValue(url);
+                          }}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                        >
+                          এডিট
+                        </button>
+                        <button 
+                          onClick={() => handleRemoveImage(idx)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Video Management Section */}
+              <div className="mt-8 pt-6 border-t border-gray-100 space-y-4">
+                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                  <Video size={20} className="text-blue-600" /> নতুন ভিডিও লিংক যোগ করুন (ঐচ্ছিক)
+                </h3>
+                <div className="flex gap-2">
+                  <input 
+                    id="new-video-url" 
+                    placeholder="ড্রাইভ ভিডিও প্রিভিউ লিংক দিন" 
+                    className="flex-1 p-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                  />
+                  <button 
+                    onClick={() => {
+                      const input = document.getElementById('new-video-url') as HTMLInputElement;
+                      if (input.value) {
+                        handleUpdateVideos(input.value);
+                        input.value = '';
+                      }
+                    }}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold text-sm"
+                  >
+                    যোগ করুন
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <h4 className="font-bold text-gray-700 text-sm">বর্তমান ভিডিও লিংকগুলো</h4>
+                  {category.images?.filter(url => url.includes('drive.google.com')).map((url, idx) => (
+                    <div key={idx} className="flex flex-col gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                      <div className="flex items-center gap-2">
+                        {editingVideoIndex === idx ? (
+                          <>
+                            <input 
+                              value={editingVideoValue}
+                              onChange={(e) => setEditingVideoValue(e.target.value)}
+                              className="flex-1 p-2 text-xs border rounded-lg outline-none focus:border-blue-500"
+                            />
+                            <button 
+                              onClick={() => handleEditVideo(idx, editingVideoValue)}
+                              className="p-2 bg-green-600 text-white rounded-lg"
+                            >
+                              সেভ
+                            </button>
+                            <button 
+                              onClick={() => setEditingVideoIndex(null)}
+                              className="p-2 bg-gray-400 text-white rounded-lg"
+                            >
+                              <X size={14} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex-1 text-[10px] text-gray-500 truncate">{url.split('#')[0]}</div>
+                            <button 
+                              onClick={() => {
+                                setEditingVideoIndex(idx);
+                                setEditingVideoValue(url);
+                              }}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                            >
+                              এডিট
+                            </button>
+                            <button 
+                              onClick={() => handleRemoveVideo(idx)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-gray-400">রেশিও:</span>
+                        {['16/9', '9/16', '1/1', '4/3'].map((ratio) => (
+                          <button
+                            key={ratio}
+                            onClick={() => {
+                              const cleanUrl = url.split('#')[0];
+                              handleEditVideo(idx, `${cleanUrl}#ratio=${ratio}`);
+                            }}
+                            className={`px-2 py-1 text-[10px] rounded-md border transition-colors ${
+                              getVideoRatio(url) === ratio 
+                                ? 'bg-blue-600 text-white border-blue-600' 
+                                : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                            }`}
+                          >
+                            {ratio.replace('/', ':')}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Video List Section */}
+          {category.images && category.images.some(url => url.includes('drive.google.com')) && (
+            <div className="max-w-[700px] mx-auto my-8 p-4 space-y-6">
+              <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
+                <Video size={24} className="text-blue-600" />
+                <h3 className="text-xl font-bold text-gray-800">ভিডিও গ্যালারি</h3>
+              </div>
+              <div className="grid grid-cols-1 gap-6">
+                {category.images.filter(url => url.includes('drive.google.com')).map((url, idx) => (
+                  <div key={idx} className="bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-100">
+                    <div 
+                      className="w-full bg-black relative" 
+                      style={{ 
+                        aspectRatio: getVideoRatio(url),
+                        maxHeight: getVideoRatio(url) === '9/16' ? '80vh' : 'auto'
+                      }}
+                    >
+                      <iframe
+                        src={getEmbedUrl(url)}
+                        className="absolute top-0 left-0 w-full h-full"
+                        allow="autoplay"
+                        allowFullScreen
+                        style={{ border: 'none' }}
+                      ></iframe>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Gallery List */}
+          <div className="max-w-[700px] mx-auto my-[12px] p-[10px] flex flex-col gap-[12px]">
+            {(!category.images || category.images.filter(url => !url.includes('drive.google.com')).length === 0) ? (
+              <div className="bg-white rounded-3xl p-10 text-center border-2 border-dashed border-gray-200">
+                <ImageIcon size={48} className="text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 font-medium">কোনো ছবি পাওয়া যায়নি</p>
+              </div>
+            ) : (
+              category.images.filter(url => !url.includes('drive.google.com')).map((url, idx) => (
+                <div key={idx} className="relative w-full rounded-[8px] overflow-hidden shadow-[0_0_6px_rgba(0,0,0,0.12)] bg-white group">
+                  <img 
+                    src={url} 
+                    className="w-full h-auto cursor-pointer hover:scale-[1.01] transition-transform duration-300" 
+                    alt="" 
+                    onClick={() => setFullscreenImage(url)}
+                  />
+                  {isAdmin && (
+                    <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => {
+                          const actualIndex = category.images.indexOf(url);
+                          setEditingUrlIndex(actualIndex);
+                          setEditingUrlValue(url);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="p-2 bg-white/90 text-blue-600 rounded-lg shadow-lg hover:bg-white"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const actualIndex = category.images.indexOf(url);
+                          handleRemoveImage(actualIndex);
+                        }}
+                        className="p-2 bg-white/90 text-red-600 rounded-lg shadow-lg hover:bg-white"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Add Event Modal */}
+      {showAddEventModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl p-6">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">নতুন ইভেন্ট যোগ করুন</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">ইভেন্টের নাম</label>
+                <input 
+                  type="text" 
+                  value={newEvent.bn}
+                  onChange={(e) => setNewEvent({ ...newEvent, bn: e.target.value })}
+                  className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-blue-500"
+                  placeholder="যেমন: বার্ষিক পিকনিক"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">তারিখ</label>
+                <input 
+                  type="text" 
+                  value={newEvent.date}
+                  onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                  className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-blue-500"
+                  placeholder="যেমন: ১২/০৩/২০২৪"
+                />
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button 
+                  onClick={() => setShowAddEventModal(false)}
+                  className="flex-1 py-3 font-bold text-gray-500 bg-gray-100 rounded-xl"
+                >
+                  বাতিল
+                </button>
+                <button 
+                  onClick={handleAddSubEvent}
+                  className="flex-1 py-3 font-bold text-white bg-blue-600 rounded-xl"
+                >
+                  যোগ করুন
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
-
-      {/* Gallery List */}
-      <div className="max-w-[700px] mx-auto my-[12px] p-[10px] flex flex-col gap-[12px]">
-        {(!category.images || category.images.length === 0) ? (
-          <div className="bg-white rounded-3xl p-10 text-center border-2 border-dashed border-gray-200">
-            <ImageIcon size={48} className="text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500 font-medium">কোনো ছবি পাওয়া যায়নি</p>
-          </div>
-        ) : (
-          category.images.map((url, idx) => (
-            <div key={idx} className="relative w-full rounded-[8px] overflow-hidden shadow-[0_0_6px_rgba(0,0,0,0.12)] bg-white group">
-              <img 
-                src={url} 
-                className="w-full h-auto cursor-pointer hover:scale-[1.01] transition-transform duration-300" 
-                alt="" 
-                onClick={() => setFullscreenImage(url)}
-              />
-              {isAdmin && (
-                <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button 
-                    onClick={() => {
-                      setEditingUrlIndex(idx);
-                      setEditingUrlValue(url);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="p-2 bg-white/90 text-blue-600 rounded-lg shadow-lg hover:bg-white"
-                  >
-                    <Edit size={14} />
-                  </button>
-                  <button 
-                    onClick={() => handleRemoveImage(idx)}
-                    className="p-2 bg-white/90 text-red-600 rounded-lg shadow-lg hover:bg-white"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
 
       {/* PIN Modal */}
       {showPinModal && (

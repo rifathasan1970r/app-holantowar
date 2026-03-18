@@ -520,7 +520,7 @@ const App: React.FC = () => {
         <Route path="/download-app.html" element={<DownloadAppView onBack={() => setCurrentView('MENU')} />} />
         <Route path="/emergency-notice.html" element={<EmergencyNoticeDetailView onBack={() => setCurrentView('HOME')} />} />
         <Route path="/gallery.html" element={<GalleryView onBack={() => setCurrentView('MENU')} setView={setCurrentView} />} />
-        <Route path="/gallery-detail.html" element={<GalleryDetailView onBack={() => setCurrentView('GALLERY')} />} />
+        <Route path="/gallery-detail.html" element={<GalleryDetailView onBack={() => setCurrentView('GALLERY')} setView={setCurrentView} />} />
         <Route path="/gallery-control-room.html" element={<GalleryControlRoomView onBack={() => setCurrentView('GALLERY')} />} />
         
         {/* Fallback */}
