@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Lock, Unlock, Plus, Trash2, Settings, X, Image as ImageIcon, ChevronLeft } from 'lucide-react';
+import { ArrowLeft, Lock, Unlock, Plus, Trash2, Settings, X, ChevronLeft } from 'lucide-react';
 import { ViewState } from '../types';
 import { supabase } from '../lib/supabaseClient';
 
@@ -468,7 +468,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
               </div>
               
               <div className="bg-gray-50 p-6 rounded-2xl space-y-4">
-                <h3 className="font-bold text-gray-800 flex items-center gap-2"><ImageIcon size={20} /> স্লাইডার ইমেজ ম্যানেজমেন্ট</h3>
+                <h3 className="font-bold text-gray-800 flex items-center gap-2"><Lock size={20} className="opacity-50" /> স্লাইডার ইমেজ ম্যানেজমেন্ট</h3>
                 <div className="space-y-3">
                   {mainSliderImages.map((url, idx) => (
                     <div key={idx} className="flex items-center gap-2 bg-white p-2 rounded-xl border border-gray-100">

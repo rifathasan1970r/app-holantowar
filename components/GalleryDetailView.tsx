@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, X, Image as ImageIcon, Lock, Unlock, Key, Settings, Edit, Video } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, X, Lock, Unlock, Key, Settings, Edit, Video, ChevronRight } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { ViewState } from '../types';
@@ -35,7 +35,9 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
   const [mainSliderImages, setMainSliderImages] = useState<string[]>([]);
   const [subEvents, setSubEvents] = useState<GalleryCategory[]>([]);
   const [showAddEventModal, setShowAddEventModal] = useState(false);
+  const [showEditEventModal, setShowEditEventModal] = useState(false);
   const [newEvent, setNewEvent] = useState({ bn: '', date: '' });
+  const [editingSubEvent, setEditingSubEvent] = useState<{ id: string, bn: string, date: string } | null>(null);
 
   const categoryId = new URLSearchParams(location.search).get('id');
   const isAdminParam = new URLSearchParams(location.search).get('admin');
@@ -162,6 +164,28 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
       alert('Error deleting event: ' + error.message);
     } else {
       if (category) fetchSubEvents(category.id);
+    }
+  };
+
+  const handleUpdateSubEvent = async () => {
+    if (!editingSubEvent || !editingSubEvent.bn || !editingSubEvent.date || !category) return;
+
+    const updatedData = {
+      bn: editingSubEvent.bn,
+      en: `SUB_EVENT:${category.id}:${editingSubEvent.date}`
+    };
+
+    const { error } = await supabase
+      .from('gallery_categories')
+      .update(updatedData)
+      .eq('id', editingSubEvent.id);
+
+    if (error) {
+      alert('Error updating event: ' + error.message);
+    } else {
+      setShowEditEventModal(false);
+      setEditingSubEvent(null);
+      fetchSubEvents(category.id);
     }
   };
 
@@ -405,6 +429,7 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
           <button 
             onClick={() => isAdmin ? setIsAdmin(false) : setShowPinModal(true)}
             className={`p-2 rounded-xl transition-all ${isAdmin ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
+            title={isAdmin ? "লক করুন" : "এডিট মোড আনলক করুন"}
           >
             {isAdmin ? <Settings size={20} /> : <Key size={20} />}
           </button>
@@ -413,9 +438,10 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
 
       {category.en === 'Events & Gatherings' ? (
         /* Events List View */
-        <div className="max-w-[700px] mx-auto p-4 space-y-4">
-          <div className="bg-[#3b5998] text-white text-center p-[12px_10px] text-[18px] font-bold rounded-xl shadow-md mb-6">
-            {category.bn} ({category.en})
+        <div className="max-w-[700px] mx-auto p-4 space-y-3">
+          <div className="bg-[#3b5998] text-white text-center p-[12px_10px] rounded-xl shadow-md mb-6 flex flex-col gap-1">
+            <div className="text-[18px] font-bold leading-tight">{category.bn}</div>
+            <div className="text-[14px] font-medium opacity-90">({category.en})</div>
           </div>
 
           {isAdmin && (
@@ -430,14 +456,14 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
           <div className="space-y-3">
             {subEvents.length === 0 ? (
               <div className="bg-white rounded-3xl p-10 text-center border-2 border-dashed border-gray-200">
-                <ImageIcon size={48} className="text-gray-300 mx-auto mb-3" />
+                <Lock size={48} className="text-gray-200 mx-auto mb-3 opacity-50" />
                 <p className="text-gray-500 font-medium">কোনো ইভেন্ট পাওয়া যায়নি</p>
               </div>
             ) : (
               subEvents.map((event) => {
                 const eventDate = event.en.split(':')[2];
                 return (
-                  <div key={event.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex items-stretch">
+                  <div key={event.id} className="group bg-white rounded-xl shadow-[0_2px_12px_-3px_rgba(0,0,0,0.06),0_4px_6px_-2px_rgba(0,0,0,0.03)] border border-gray-100 overflow-hidden flex items-stretch hover:shadow-md transition-all duration-300 active:scale-[0.99]">
                     <button 
                       onClick={() => {
                         if (setView) {
@@ -446,18 +472,51 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
                           window.location.search = `?id=${event.id}&admin=${isAdmin ? 'true' : 'false'}`;
                         }
                       }}
-                      className="flex-1 p-4 flex flex-col items-start gap-1 hover:bg-gray-50 transition-colors text-left"
+                      className="flex-1 p-3.5 flex items-center gap-3.5 hover:bg-gray-50/50 transition-colors text-left min-w-0"
                     >
-                      <span className="text-blue-600 font-bold text-sm">{eventDate}</span>
-                      <span className="text-gray-800 font-bold text-lg">{event.bn}</span>
+                      {/* Date Section */}
+                      <div className="flex flex-col items-center justify-center bg-blue-50 text-blue-700 px-2 py-1.5 rounded-xl w-[80px] border border-blue-100 flex-shrink-0">
+                        <span className="text-[9px] uppercase tracking-wider font-bold opacity-70">তারিখ</span>
+                        <span className="text-[13px] font-black text-center leading-tight">{eventDate}</span>
+                      </div>
+                      
+                      {/* Name Section */}
+                      <div className="flex-1 min-w-0 flex flex-col justify-center py-0.5">
+                        <span className="text-gray-900 font-bold text-[16px] leading-[1.4] group-hover:text-blue-700 transition-colors break-words">
+                          {event.bn}
+                        </span>
+                        <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium mt-1">
+                          {event.is_locked ? (
+                            <Lock size={10} className="text-red-300 flex-shrink-0 opacity-70" />
+                          ) : (
+                            <Unlock size={10} className="text-green-300 flex-shrink-0 opacity-70" />
+                          )}
+                          <span>ইভেন্ট বিস্তারিত দেখুন</span>
+                        </div>
+                      </div>
+                      
+                      <ChevronRight size={16} className="text-gray-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
                     </button>
                     {isAdmin && (
-                      <button 
-                        onClick={() => handleDeleteSubEvent(event.id)}
-                        className="p-4 text-red-500 hover:bg-red-50 transition-colors border-l border-gray-100"
-                      >
-                        <Trash2 size={20} />
-                      </button>
+                      <div className="flex border-l border-gray-50 bg-gray-50/30">
+                        <button 
+                          onClick={() => {
+                            setEditingSubEvent({ id: event.id, bn: event.bn, date: eventDate });
+                            setShowEditEventModal(true);
+                          }}
+                          className="px-3.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-all border-r border-gray-100 flex items-center justify-center"
+                          title="এডিট করুন"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteSubEvent(event.id)}
+                          className="px-3.5 text-red-400 hover:text-red-600 hover:bg-red-50 transition-all flex items-center justify-center"
+                          title="ডিলিট করুন"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     )}
                   </div>
                 );
@@ -494,8 +553,11 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
           )}
 
           {/* Header Title */}
-          <div className="bg-[#3b5998] text-white text-center p-[12px_10px] text-[18px] font-bold mt-[15px] max-w-[700px] mx-auto shadow-md">
-            {category.bn} {category.en.startsWith('SUB_EVENT:') ? `(${category.en.split(':')[2]})` : `(${category.en})`}
+          <div className="bg-[#3b5998] text-white text-center p-[12px_10px] mt-[15px] max-w-[700px] mx-auto shadow-md flex flex-col gap-1">
+            <div className="text-[18px] font-bold leading-tight">{category.bn}</div>
+            <div className="text-[14px] font-medium opacity-90">
+              {category.en.startsWith('SUB_EVENT:') ? `(${category.en.split(':')[2]})` : `(${category.en})`}
+            </div>
           </div>
 
           {/* Admin Panel */}
@@ -704,7 +766,7 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
           <div className="max-w-[700px] mx-auto my-[12px] p-[10px] flex flex-col gap-[12px]">
             {(!category.images || category.images.filter(url => !url.includes('drive.google.com')).length === 0) ? (
               <div className="bg-white rounded-3xl p-10 text-center border-2 border-dashed border-gray-200">
-                <ImageIcon size={48} className="text-gray-300 mx-auto mb-3" />
+                <Lock size={48} className="text-gray-200 mx-auto mb-3 opacity-50" />
                 <p className="text-gray-500 font-medium">কোনো ছবি পাওয়া যায়নি</p>
               </div>
             ) : (
@@ -785,6 +847,51 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
                   className="flex-1 py-3 font-bold text-white bg-blue-600 rounded-xl"
                 >
                   যোগ করুন
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Event Modal */}
+      {showEditEventModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl p-6">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">ইভেন্ট এডিট করুন</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">ইভেন্টের নাম</label>
+                <input 
+                  type="text" 
+                  value={editingSubEvent?.bn || ''}
+                  onChange={(e) => setEditingSubEvent(prev => prev ? { ...prev, bn: e.target.value } : null)}
+                  className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-blue-500"
+                  placeholder="ইভেন্টের নাম লিখুন"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">তারিখ</label>
+                <input 
+                  type="text" 
+                  value={editingSubEvent?.date || ''}
+                  onChange={(e) => setEditingSubEvent(prev => prev ? { ...prev, date: e.target.value } : null)}
+                  className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-blue-500"
+                  placeholder="তারিখ লিখুন"
+                />
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button 
+                  onClick={() => setShowEditEventModal(false)}
+                  className="flex-1 py-3 font-bold text-gray-500 bg-gray-100 rounded-xl"
+                >
+                  বাতিল
+                </button>
+                <button 
+                  onClick={handleUpdateSubEvent}
+                  className="flex-1 py-3 font-bold text-white bg-blue-600 rounded-xl"
+                >
+                  আপডেট করুন
                 </button>
               </div>
             </div>
