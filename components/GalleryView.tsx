@@ -334,7 +334,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
         <div 
           className="flex w-full" 
           style={{ 
-            animation: `slide ${loopSlides.length * 4}s infinite`,
+            animation: `slide ${loopSlides.length * 3}s infinite`,
             display: 'flex',
             width: `${loopSlides.length * 100}%`
           }}
@@ -344,8 +344,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
               key={index} 
               src={src} 
               style={{ width: `${100 / loopSlides.length}%` }}
-              onClick={() => setFullscreenImage(src)}
-              className="height-auto flex-shrink-0 object-contain cursor-pointer" 
+              className="height-auto flex-shrink-0 object-contain" 
               alt={`Slide ${index + 1}`}
             />
           ))}
@@ -611,7 +610,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
             onClick={() => setFullscreenImage(null)}
             className="text-white bg-[#d1b3ff] p-[12px_20px] rounded-xl text-lg font-semibold cursor-pointer mb-[15px] shadow-[0_0_12px_rgba(209,179,255,0.8)] transition-all duration-300 flex items-center gap-2 hover:bg-[#b78cff] hover:shadow-[0_0_18px_rgba(183,140,255,1)] hover:scale-105"
           >
-            <ChevronLeft size={20} /> ফিরে যাও
+            <ChevronLeft size={20} /> ফিরে যান
           </button>
           <img src={fullscreenImage} className="max-w-[95vw] max-h-[85vh] rounded-xl shadow-[0_0_20px_#fff] object-contain" alt="Fullscreen" />
         </div>

@@ -537,7 +537,7 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
               <div 
                 className="flex w-full" 
                 style={{ 
-                  animation: `gallerySlide ${loopSlides.length * 4}s infinite`,
+                  animation: `gallerySlide ${loopSlides.length * 3}s infinite`,
                   display: 'flex',
                   width: `${loopSlides.length * 100}%`
                 }}
@@ -547,9 +547,8 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
                     key={idx} 
                     src={src} 
                     style={{ width: `${100 / loopSlides.length}%` }}
-                    className="height-auto flex-shrink-0 object-contain cursor-pointer" 
+                    className="height-auto flex-shrink-0 object-contain" 
                     alt="" 
-                    onClick={() => setFullscreenImage(src)}
                   />
                 ))}
               </div>
@@ -942,14 +941,14 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
 
       {/* Fullscreen Image */}
       {fullscreenImage && (
-        <div className="fixed inset-0 z-[200] bg-black flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center p-4">
           <button 
             onClick={() => setFullscreenImage(null)}
-            className="absolute top-6 right-6 p-2 bg-white/20 text-white rounded-full backdrop-blur-md"
+            className="text-white bg-[#d1b3ff] p-[10px_20px] rounded-xl text-lg font-semibold cursor-pointer mb-[15px] shadow-[0_0_12px_rgba(209,179,255,0.8)] transition-all duration-300 flex items-center gap-2 hover:bg-[#b78cff] hover:shadow-[0_0_18px_rgba(183,140,255,1)] hover:scale-105 active:scale-95"
           >
-            <X size={24} />
+            <ArrowLeft size={20} /> ফিরে যান
           </button>
-          <img src={fullscreenImage} className="max-w-full max-h-full object-contain" alt="" />
+          <img src={fullscreenImage} className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl" alt="" />
         </div>
       )}
 

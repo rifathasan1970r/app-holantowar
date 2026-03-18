@@ -132,7 +132,7 @@ const GalleryControlRoomView: React.FC<GalleryControlRoomViewProps> = ({ onBack 
             onClick={() => setFullscreenImage(null)}
             className="mb-4 text-white bg-[#d1b3ff] p-[8px_16px] rounded-xl text-sm font-semibold cursor-pointer shadow-[0_0_10px_rgba(209,179,255,0.5)] transition-all duration-300 flex items-center gap-2 hover:bg-[#b78cff] hover:shadow-[0_0_15px_rgba(183,140,255,0.7)] hover:scale-105"
           >
-            <ChevronLeft size={16} /> ফিরে যাও
+            <ChevronLeft size={16} /> ফিরে যান
           </button>
 
           <img 
