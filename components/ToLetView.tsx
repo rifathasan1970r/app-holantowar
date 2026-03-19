@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, Unlock, Plus, Trash2, ChevronLeft, Building2, MapPin, Phone, CheckCircle2, X, Edit2 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 
 const FLOOR_OPTIONS = [
@@ -30,7 +31,7 @@ export const ToLetView = () => {
   const [showPinModal, setShowPinModal] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
-  const [selectedFlat, setSelectedFlat] = useState<Flat | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [flats, setFlats] = useState<Flat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,17 +44,51 @@ export const ToLetView = () => {
   });
 
   // Owner and Contact Details State
-  const [ownerName, setOwnerName] = useState(() => localStorage.getItem('ownerName') || 'ফিরোজ মোল্লা');
-  const [ownerPhone, setOwnerPhone] = useState(() => localStorage.getItem('ownerPhone') || '০১৯×××××××');
-  const [contactName, setContactName] = useState(() => localStorage.getItem('contactName') || 'রিফাত');
-  const [contactPhone, setContactPhone] = useState(() => localStorage.getItem('contactPhone') || '+8801310988954');
+  const [ownerName, setOwnerName] = useState('ফিরোজ মোল্লা');
+  const [ownerPhone, setOwnerPhone] = useState('০১৯×××××××');
+  const [contactName, setContactName] = useState('রিফাত');
+  const [contactPhone, setContactPhone] = useState('+8801310988954');
 
-  useEffect(() => {
-    localStorage.setItem('ownerName', ownerName);
-    localStorage.setItem('ownerPhone', ownerPhone);
-    localStorage.setItem('contactName', contactName);
-    localStorage.setItem('contactPhone', contactPhone);
-  }, [ownerName, ownerPhone, contactName, contactPhone]);
+  const selectedFlat = flats.find(f => f.id.toString() === searchParams.get('flatId')) || null;
+
+  const fetchSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('*')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setOwnerName(data.owner_name || 'ফিরোজ মোল্লা');
+        setOwnerPhone(data.owner_phone || '০১৯×××××××');
+        setContactName(data.contact_name || 'রিফাত');
+        setContactPhone(data.contact_phone || '+8801310988954');
+      }
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+    }
+  };
+
+  const saveSettings = async () => {
+    try {
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({
+          id: 1,
+          owner_name: ownerName,
+          owner_phone: ownerPhone,
+          contact_name: contactName,
+          contact_phone: contactPhone
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving settings:', error);
+    }
+  };
 
   const getUnitsForFloor = (floorLabel: string) => {
     const floor = FLOOR_OPTIONS.find(f => f.label === floorLabel);
@@ -61,9 +96,10 @@ export const ToLetView = () => {
     return [`${floor.num}A`, `${floor.num}B`, `${floor.num}C`];
   };
 
-  // Fetch flats from Supabase
+  // Fetch flats and settings from Supabase
   useEffect(() => {
     fetchFlats();
+    fetchSettings();
     
     // Add Font Awesome
     const link = document.createElement('link');
@@ -234,7 +270,7 @@ export const ToLetView = () => {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => {
-                setSelectedFlat(null);
+                setSearchParams({});
                 setShowOwnerDetails(false);
               }}
               className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
@@ -245,7 +281,14 @@ export const ToLetView = () => {
           </div>
           
           <button 
-            onClick={() => isLocked ? setShowPinModal(true) : setIsLocked(true)}
+            onClick={() => {
+              if (isLocked) {
+                setShowPinModal(true);
+              } else {
+                setIsLocked(true);
+                saveSettings();
+              }
+            }}
             className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-400 hover:text-emerald-500 transition-colors shadow-sm mr-1"
             title={isLocked ? "Unlock to edit" : "Lock to save"}
           >
@@ -521,7 +564,14 @@ export const ToLetView = () => {
       {/* Admin Controls */}
       <div className="absolute top-0 right-0 flex gap-2 z-20">
         <button 
-          onClick={() => isLocked ? setShowPinModal(true) : setIsLocked(true)}
+          onClick={() => {
+            if (isLocked) {
+              setShowPinModal(true);
+            } else {
+              setIsLocked(true);
+              saveSettings();
+            }
+          }}
           className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-400 hover:text-emerald-500 transition-colors shadow-sm"
           title={isLocked ? "Unlock to edit" : "Lock to save"}
         >
@@ -771,7 +821,7 @@ export const ToLetView = () => {
 
                   <button 
                     className="ht-unit-box" 
-                    onClick={() => setSelectedFlat(flat)}
+                    onClick={() => setSearchParams({ flatId: flat.id.toString() })}
                   >
                     <span className="flex items-center justify-center gap-2">
                       {flat.info}
