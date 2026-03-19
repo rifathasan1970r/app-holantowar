@@ -51,16 +51,16 @@ const PremiumMapCard: React.FC = () => {
         </div>
 
         {/* Bottom Details */}
-        <div className="px-8 py-6 bg-emerald-50/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="px-8 py-6 bg-emerald-50/20 flex flex-col gap-4">
           <div>
             <p className="text-emerald-600/60 text-[10px] font-bold uppercase tracking-widest mb-1">Address</p>
-            <p className="text-emerald-900 text-sm font-medium">হলান টাওয়ার, দক্ষিণখান, ঢাকা - ১২৩০</p>
+            <p className="text-emerald-900 text-sm font-bold">হলান টাওয়ার, দক্ষিণখান, ঢাকা - ১২৩০</p>
           </div>
           <a 
             href="https://maps.app.goo.gl/mwFP2BxYm1cK2m2P9"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+            className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-emerald-500/20 transition-all active:scale-95 w-full"
           >
             <Navigation size={16} />
             Open in Google Maps
