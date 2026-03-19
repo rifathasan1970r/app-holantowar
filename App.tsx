@@ -522,6 +522,9 @@ const App: React.FC = () => {
         <Route path="/gallery.html" element={<GalleryView onBack={() => setCurrentView('MENU')} setView={setCurrentView} />} />
         <Route path="/gallery-detail.html" element={<GalleryDetailView onBack={() => setCurrentView('GALLERY')} setView={setCurrentView} />} />
         <Route path="/gallery-control-room.html" element={<GalleryControlRoomView onBack={() => setCurrentView('GALLERY')} />} />
+        <Route path="/unit-a" element={<Navigate to="/gallery-detail.html?id=unit-a" replace />} />
+        <Route path="/unit-b" element={<Navigate to="/gallery-detail.html?id=unit-b" replace />} />
+        <Route path="/unit-c" element={<Navigate to="/gallery-detail.html?id=unit-c" replace />} />
         
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

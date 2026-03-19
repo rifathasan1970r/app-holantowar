@@ -26,7 +26,7 @@ interface Flat {
   };
 }
 
-export const ToLetView = () => {
+export const ToLetView = ({ setView }: { setView?: (view: string, params?: any) => void }) => {
   const [isLocked, setIsLocked] = useState(true);
   const [showPinModal, setShowPinModal] = useState(false);
   const [pin, setPin] = useState('');
@@ -37,6 +37,7 @@ export const ToLetView = () => {
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [showOwnerDetails, setShowOwnerDetails] = useState(false);
+  const [galleryCategoryId, setGalleryCategoryId] = useState<string | null>(null);
   const [newFlat, setNewFlat] = useState({
     floor: '',
     unit: '',
@@ -49,7 +50,7 @@ export const ToLetView = () => {
   const [contactName, setContactName] = useState('রিফাত');
   const [contactPhone, setContactPhone] = useState('+8801310988954');
 
-  const selectedFlat = flats.find(f => f.details.unit === searchParams.get('unit')) || null;
+  const selectedFlat = flats.find(f => f.details.unit === searchParams.get('tolet_unit')) || null;
 
   const fetchSettings = async () => {
     try {
@@ -101,6 +102,16 @@ export const ToLetView = () => {
     fetchFlats();
     fetchSettings();
     
+    const fetchGalleryCategory = async () => {
+      const { data, error } = await supabase
+        .from('gallery_categories')
+        .select('id')
+        .eq('en', 'Flat Interior View')
+        .single();
+      if (data) setGalleryCategoryId(data.id);
+    };
+    fetchGalleryCategory();
+
     // Add Font Awesome
     const link = document.createElement('link');
     link.rel = 'stylesheet';
@@ -384,14 +395,6 @@ export const ToLetView = () => {
               </div>
             </div>
           </div>
-
-          <a 
-            href="https://holantower.blogspot.com/p/holan-tower-gallery-flat-interior-view.html" 
-            target="_blank"
-            className="block mx-auto mt-[18px] bg-gradient-to-r from-[#ff7e5f] to-[#feb47b] px-[18px] py-3 rounded-xl text-white font-extrabold text-center text-base w-max shadow-md active:scale-95 transition-transform"
-          >
-            <i className="fa-solid fa-image mr-2"></i> ফ্ল্যাটের ছবি দেখুন
-          </a>
 
           {/* Owner Section */}
           <button 
@@ -821,7 +824,7 @@ export const ToLetView = () => {
 
                   <button 
                     className="ht-unit-box" 
-                    onClick={() => setSearchParams({ unit: flat.details.unit })}
+                    onClick={() => setSearchParams({ tolet_unit: flat.details.unit })}
                   >
                     <span className="flex items-center justify-center gap-2">
                       {flat.info}

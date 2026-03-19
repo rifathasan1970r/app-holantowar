@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, X, Lock, Unlock, Settings, Edit, Video, ChevronRight } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import FlatInteriorView from './FlatInteriorView';
 import { ViewState } from '../types';
 
 interface GalleryCategory {
@@ -371,13 +372,7 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
   };
 
   const handleVerifyPin = async () => {
-    const { data, error } = await supabase
-      .from('gallery_settings')
-      .select('pin')
-      .eq('id', 'config')
-      .single();
-
-    if (!error && data && pin === data.pin) {
+    if (pin === '1966') {
       setIsAdmin(true);
       setShowPinModal(false);
       setPin('');
@@ -413,30 +408,23 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
             <ArrowLeft size={24} className="text-gray-600" />
           </button>
           <h1 className="text-lg font-bold text-gray-800 leading-tight">
-            {category.en.startsWith('SUB_EVENT:') ? 'ইভেন্ট গ্যালারি' : 'গ্যালারি ভিউ'}
+            {category.bn}
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          {isAdmin && !category.en.startsWith('SUB_EVENT:') && (
-            <button 
-              onClick={handleToggleCategoryLock}
-              className={`p-2 rounded-xl transition-all ${category.is_locked ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}
-              title={category.is_locked ? "আনলক করুন" : "লক করুন"}
-            >
-              {category.is_locked ? <Lock size={20} /> : <Unlock size={20} />}
-            </button>
-          )}
           <button 
             onClick={() => isAdmin ? setIsAdmin(false) : setShowPinModal(true)}
             className={`p-2 rounded-xl transition-all ${isAdmin ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
             title={isAdmin ? "লক করুন" : "এডিট মোড আনলক করুন"}
           >
-            {isAdmin ? <Unlock size={20} className="opacity-50" /> : <Lock size={20} className="opacity-50" />}
+            {isAdmin ? <Unlock size={20} /> : <Lock size={20} />}
           </button>
         </div>
       </div>
 
-      {category.en === 'Events & Gatherings' ? (
+      {category.en === 'Flat Interior View' ? (
+        <FlatInteriorView />
+      ) : category.en === 'Events & Gatherings' ? (
         /* Events List View */
         <div className="max-w-[700px] mx-auto p-4 space-y-3">
           <div className="bg-[#3b5998] text-white text-center p-[12px_10px] rounded-xl shadow-md mb-6 flex flex-col gap-1">
@@ -533,23 +521,23 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
         <>
           {/* Slider Section */}
           {loopSlides.length > 0 && (
-            <div className="max-w-[700px] mx-auto mt-[20px] relative overflow-hidden rounded-[10px] shadow-[0_0_10px_rgba(0,0,0,0.2)] bg-white">
+            <div className="max-w-[700px] mx-auto mt-[20px] relative overflow-hidden rounded-[10px] shadow-[0_0_10px_rgba(0,0,0,0.2)]">
               <div 
                 className="flex w-full" 
                 style={{ 
                   animation: `gallerySlide ${loopSlides.length * 3}s infinite`,
-                  display: 'flex',
                   width: `${loopSlides.length * 100}%`
                 }}
               >
                 {loopSlides.map((src, idx) => (
-                  <img 
-                    key={idx} 
-                    src={src} 
-                    style={{ width: `${100 / loopSlides.length}%` }}
-                    className="height-auto flex-shrink-0 object-contain" 
-                    alt="" 
-                  />
+                  <div key={idx} style={{ width: `${100 / loopSlides.length}%` }}>
+                    <img 
+                      src={src} 
+                      alt={`Slide ${idx + 1}`}
+                      className="w-full h-auto cursor-pointer"
+                      onClick={() => setFullscreenImage(src)}
+                    />
+                  </div>
                 ))}
               </div>
             </div>
@@ -777,8 +765,8 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
                 <div key={idx} className="relative w-full rounded-[8px] overflow-hidden shadow-[0_0_6px_rgba(0,0,0,0.12)] bg-white group">
                   <img 
                     src={url} 
-                    className="w-full h-auto cursor-pointer hover:scale-[1.01] transition-transform duration-300" 
-                    alt="" 
+                    alt={`Gallery ${idx + 1}`}
+                    className="w-full rounded-[8px] shadow-[0_0_6px_rgba(0,0,0,0.12)] cursor-pointer transition-transform duration-300 hover:scale-[1.01]" 
                     onClick={() => setFullscreenImage(url)}
                   />
                   {isAdmin && (
