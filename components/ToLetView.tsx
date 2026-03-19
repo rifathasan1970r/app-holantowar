@@ -49,7 +49,7 @@ export const ToLetView = () => {
   const [contactName, setContactName] = useState('রিফাত');
   const [contactPhone, setContactPhone] = useState('+8801310988954');
 
-  const selectedFlat = flats.find(f => f.id.toString() === searchParams.get('flatId')) || null;
+  const selectedFlat = flats.find(f => f.details.unit === searchParams.get('unit')) || null;
 
   const fetchSettings = async () => {
     try {
@@ -821,7 +821,7 @@ export const ToLetView = () => {
 
                   <button 
                     className="ht-unit-box" 
-                    onClick={() => setSearchParams({ flatId: flat.id.toString() })}
+                    onClick={() => setSearchParams({ unit: flat.details.unit })}
                   >
                     <span className="flex items-center justify-center gap-2">
                       {flat.info}
