@@ -169,6 +169,7 @@ export const MapRoutesView: React.FC<MapRoutesViewProps> = ({ onBack }) => {
           .highlight-station {
             border: 2px solid #f59e0b !important;
             background: #fffbeb !important;
+            color: #92400e !important;
             box-shadow: 0 0 20px rgba(245, 158, 11, 0.25) !important;
             transform: scale(1.05);
             z-index: 5;
@@ -186,20 +187,20 @@ export const MapRoutesView: React.FC<MapRoutesViewProps> = ({ onBack }) => {
           }
           .route-transport, .route-fare {
             font-size: 0.9rem;
-            background: rgba(255, 255, 255, 0.95);
+            background: #f5f3ff;
             padding: 14px 18px;
             border-radius: 16px;
             margin-bottom: 14px;
-            color: #064e3b;
+            color: #5b21b6;
             font-weight: 700;
             max-width: 100%;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid #ddd6fe;
+            box-shadow: 0 4px 6px rgba(139, 92, 246, 0.05);
           }
           .fare-list {
             margin-left: 10px;
             margin-top: 8px;
-            color: #065f46;
+            color: #6d28d9;
             font-weight: 600;
             list-style-type: none;
             display: flex;
@@ -250,7 +251,9 @@ export const MapRoutesView: React.FC<MapRoutesViewProps> = ({ onBack }) => {
                         {route.path.map((station, index) => (
                           <div 
                             key={index} 
-                            className={`station-box ${(index === 0 || index === route.path.length - 1) ? 'highlight-station' : ''}`}
+                            className={`station-box ${
+                              (index === 0 || index === route.path.length - 1) ? 'highlight-station' : ''
+                            }`}
                           >
                             {station}
                           </div>
@@ -291,7 +294,9 @@ export const MapRoutesView: React.FC<MapRoutesViewProps> = ({ onBack }) => {
                     {route.path.map((station, index) => (
                       <div 
                         key={index} 
-                        className={`station-box ${(index === 0 || index === route.path.length - 1) ? 'highlight-station' : ''}`}
+                        className={`station-box ${
+                          (index === 0 || index === route.path.length - 1) ? 'highlight-station' : ''
+                        }`}
                       >
                         {station}
                       </div>
