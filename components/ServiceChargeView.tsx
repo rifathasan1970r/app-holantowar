@@ -192,6 +192,7 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
     const section = params.get('section');
     const year = params.get('year');
     const unit = params.get('unit');
+    const mode = params.get('mode');
     
     if (section === 'monthly-summary') {
         setShowMonthlySummary(true);
@@ -201,7 +202,11 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
         setShowDueSummary(true);
         if (unit) onUnitSelect(unit);
     }
-    else if (section === 'parking-charge') setShowParkingView(true);
+    else if (section === 'parking-charge') {
+        setShowParkingView(true);
+        if (mode === 'parking') setViewMode('PARKING');
+        else setViewMode('SERVICE');
+    }
     else if (section === 'full-year-table') setShowFullYearTable(true);
     else if (section === 'whatsapp-view') setShowWhatsAppView(true);
     else if (section === 'sms-sender') setShowSmsSender(true);
@@ -230,6 +235,9 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
             
             if (newSection === 'due-summary' && selectedUnit) params.set('unit', selectedUnit);
             else params.delete('unit');
+
+            if (newSection === 'parking-charge') params.set('mode', viewMode.toLowerCase());
+            else params.delete('mode');
             
             navigate({ search: params.toString() }, { replace: true });
         } else if (newSection === 'monthly-summary' && params.get('year') !== selectedYear.toString()) {
@@ -238,16 +246,20 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
         } else if (newSection === 'due-summary' && selectedUnit && params.get('unit') !== selectedUnit) {
             params.set('unit', selectedUnit);
             navigate({ search: params.toString() }, { replace: true });
+        } else if (newSection === 'parking-charge' && params.get('mode') !== viewMode.toLowerCase()) {
+            params.set('mode', viewMode.toLowerCase());
+            navigate({ search: params.toString() }, { replace: true });
         }
     } else {
         if (params.has('section')) {
             params.delete('section');
             params.delete('year');
             params.delete('unit');
+            params.delete('mode');
             navigate({ search: params.toString() }, { replace: true });
         }
     }
-  }, [showMonthlySummary, showDueSummary, showParkingView, showFullYearTable, showWhatsAppView, showSmsSender, showAIAssistant, showLogin, selectedYear, selectedUnit]);
+  }, [showMonthlySummary, showDueSummary, showParkingView, showFullYearTable, showWhatsAppView, showSmsSender, showAIAssistant, showLogin, selectedYear, selectedUnit, viewMode]);
 
   // Refresh data when switching to Parking mode or becoming Admin to ensure latest configuration is loaded
   useEffect(() => {
