@@ -100,38 +100,6 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
   const [fullYearTableUnitFilter, setFullYearTableUnitFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Sync view state with URL
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const section = params.get('section');
-    if (section === 'monthly-summary') setShowMonthlySummary(true);
-    else if (section === 'due-summary') setShowDueSummary(true);
-    else if (section === 'parking-charge') setShowParkingView(true);
-    else if (section === 'full-year-table') setShowFullYearTable(true);
-  }, []);
-
-  // Update URL when state changes
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    let newSection = null;
-    if (showMonthlySummary) newSection = 'monthly-summary';
-    else if (showDueSummary) newSection = 'due-summary';
-    else if (showParkingView) newSection = 'parking-charge';
-    else if (showFullYearTable) newSection = 'full-year-table';
-
-    if (newSection) {
-        if (params.get('section') !== newSection) {
-            params.set('section', newSection);
-            navigate({ search: params.toString() }, { replace: true });
-        }
-    } else {
-        if (params.has('section')) {
-            params.delete('section');
-            navigate({ search: params.toString() }, { replace: true });
-        }
-    }
-  }, [showMonthlySummary, showDueSummary, showParkingView, showFullYearTable]);
-  
   // Supabase State
   const [dbData, setDbData] = useState<PaymentData[]>([]);
   const [unitsInfo, setUnitsInfo] = useState<Record<string, UnitInfo>>({});
@@ -217,6 +185,46 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
   const [smsSelectedUnits, setSmsSelectedUnits] = useState<string[]>(ALL_UNITS);
   const [smsSentUnits, setSmsSentUnits] = useState<string[]>([]);
   const [isSendingSms, setIsSendingSms] = useState(false);
+
+  // Sync view state with URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const section = params.get('section');
+    if (section === 'monthly-summary') setShowMonthlySummary(true);
+    else if (section === 'due-summary') setShowDueSummary(true);
+    else if (section === 'parking-charge') setShowParkingView(true);
+    else if (section === 'full-year-table') setShowFullYearTable(true);
+    else if (section === 'whatsapp-view') setShowWhatsAppView(true);
+    else if (section === 'sms-sender') setShowSmsSender(true);
+    else if (section === 'ai-assistant') setShowAIAssistant(true);
+    else if (section === 'admin-login') setShowLogin(true);
+  }, []);
+
+  // Update URL when state changes
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    let newSection = null;
+    if (showMonthlySummary) newSection = 'monthly-summary';
+    else if (showDueSummary) newSection = 'due-summary';
+    else if (showParkingView) newSection = 'parking-charge';
+    else if (showFullYearTable) newSection = 'full-year-table';
+    else if (showWhatsAppView) newSection = 'whatsapp-view';
+    else if (showSmsSender) newSection = 'sms-sender';
+    else if (showAIAssistant) newSection = 'ai-assistant';
+    else if (showLogin) newSection = 'admin-login';
+
+    if (newSection) {
+        if (params.get('section') !== newSection) {
+            params.set('section', newSection);
+            navigate({ search: params.toString() }, { replace: true });
+        }
+    } else {
+        if (params.has('section')) {
+            params.delete('section');
+            navigate({ search: params.toString() }, { replace: true });
+        }
+    }
+  }, [showMonthlySummary, showDueSummary, showParkingView, showFullYearTable, showWhatsAppView, showSmsSender, showAIAssistant, showLogin]);
 
   // Refresh data when switching to Parking mode or becoming Admin to ensure latest configuration is loaded
   useEffect(() => {
