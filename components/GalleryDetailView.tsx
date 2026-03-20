@@ -42,6 +42,7 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
 
   const categoryId = new URLSearchParams(location.search).get('id');
   const isAdminParam = new URLSearchParams(location.search).get('admin');
+  const unitParam = new URLSearchParams(location.search).get('unit');
 
   useEffect(() => {
     if (isAdminParam === 'true') {
@@ -402,28 +403,30 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
   return (
     <div className="min-h-screen bg-[#f0f0f0] pb-20">
       {/* Header */}
-      <div className="bg-white p-4 flex items-center justify-between shadow-sm sticky top-0 z-30">
-        <div className="flex items-center gap-4">
-          <button onClick={handleBack} className="p-2 hover:bg-gray-100 rounded-full">
-            <ArrowLeft size={24} className="text-gray-600" />
-          </button>
-          <h1 className="text-lg font-bold text-gray-800 leading-tight">
-            {category.bn}
-          </h1>
+      {!unitParam && (
+        <div className="bg-white p-4 flex items-center justify-between shadow-sm sticky top-0 z-30">
+          <div className="flex items-center gap-4">
+            <button onClick={handleBack} className="p-2 hover:bg-gray-100 rounded-full">
+              <ArrowLeft size={24} className="text-gray-600" />
+            </button>
+            <h1 className="text-lg font-bold text-gray-800 leading-tight">
+              {category.bn}
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => isAdmin ? setIsAdmin(false) : setShowPinModal(true)}
+              className={`p-2 rounded-xl transition-all ${isAdmin ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
+              title={isAdmin ? "লক করুন" : "এডিট মোড আনলক করুন"}
+            >
+              {isAdmin ? <Unlock size={20} /> : <Lock size={20} />}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => isAdmin ? setIsAdmin(false) : setShowPinModal(true)}
-            className={`p-2 rounded-xl transition-all ${isAdmin ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
-            title={isAdmin ? "লক করুন" : "এডিট মোড আনলক করুন"}
-          >
-            {isAdmin ? <Unlock size={20} /> : <Lock size={20} />}
-          </button>
-        </div>
-      </div>
+      )}
 
       {category.en === 'Flat Interior View' ? (
-        <FlatInteriorView />
+        <FlatInteriorView isAdmin={isAdmin} unit={unitParam} />
       ) : category.en === 'Events & Gatherings' ? (
         /* Events List View */
         <div className="max-w-[700px] mx-auto p-4 space-y-3">

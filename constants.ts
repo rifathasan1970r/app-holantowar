@@ -322,7 +322,10 @@ export const VIEW_TO_PATH: Record<string, string> = {
   GALLERY: '/gallery.html',
   GALLERY_COMING_SOON: '/gallery-coming-soon.html',
   GALLERY_CONTROL_ROOM: '/gallery-control-room.html',
-  GALLERY_DETAIL: '/gallery-detail.html'
+  GALLERY_DETAIL: '/gallery-detail.html',
+  UNIT_A: '/unit-a',
+  UNIT_B: '/unit-b',
+  UNIT_C: '/unit-c'
 };
 
 export const BOTTOM_NAV_ITEMS = [

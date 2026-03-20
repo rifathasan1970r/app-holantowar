@@ -36,6 +36,7 @@ import { DuePaymentMarquee } from './components/DuePaymentMarquee';
 import GalleryView from './components/GalleryView';
 import GalleryDetailView from './components/GalleryDetailView';
 import GalleryControlRoomView from './components/GalleryControlRoomView';
+import UnitDetailView from './components/UnitDetailView';
 
 const PATH_TO_VIEW: Record<string, ViewState> = Object.entries(VIEW_TO_PATH).reduce(
   (acc, [view, path]) => ({ ...acc, [path]: view as ViewState }),
@@ -508,7 +509,7 @@ const App: React.FC = () => {
         <Route path="/desco-rules.html" element={<DescoRulesView onBack={() => setCurrentView('DESCO')} />} />
         <Route path="/accounts.html" element={<AccountsView onBack={() => setCurrentView('MENU')} setView={setCurrentView} />} />
         <Route path="/map-routes.html" element={<MapRoutesView onBack={() => setCurrentView('MENU')} />} />
-        <Route path="/to-let.html" element={<ToLetView />} />
+        <Route path="/to-let.html" element={<ToLetView setView={setCurrentView} />} />
         <Route path="/emergency.html" element={<EmergencyView />} />
         <Route path="/lift-instructions.html" element={<LiftInstructionsView onBack={() => setCurrentView('MENU')} />} />
         <Route path="/maintenance.html" element={<MaintenanceView onBack={() => setCurrentView('MENU')} setView={setCurrentView} />} />
@@ -522,9 +523,9 @@ const App: React.FC = () => {
         <Route path="/gallery.html" element={<GalleryView onBack={() => setCurrentView('MENU')} setView={setCurrentView} />} />
         <Route path="/gallery-detail.html" element={<GalleryDetailView onBack={() => setCurrentView('GALLERY')} setView={setCurrentView} />} />
         <Route path="/gallery-control-room.html" element={<GalleryControlRoomView onBack={() => setCurrentView('GALLERY')} />} />
-        <Route path="/unit-a" element={<Navigate to="/gallery-detail.html?id=unit-a" replace />} />
-        <Route path="/unit-b" element={<Navigate to="/gallery-detail.html?id=unit-b" replace />} />
-        <Route path="/unit-c" element={<Navigate to="/gallery-detail.html?id=unit-c" replace />} />
+        <Route path="/unit-a" element={<UnitDetailView unitId="unit-a" onBack={() => navigate(-1)} />} />
+        <Route path="/unit-b" element={<UnitDetailView unitId="unit-b" onBack={() => navigate(-1)} />} />
+        <Route path="/unit-c" element={<UnitDetailView unitId="unit-c" onBack={() => navigate(-1)} />} />
         
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

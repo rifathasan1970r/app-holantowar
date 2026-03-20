@@ -396,6 +396,32 @@ export const ToLetView = ({ setView }: { setView?: (view: string, params?: any) 
             </div>
           </div>
 
+          {/* New Box: See Flat Pictures */}
+          {galleryCategoryId && (
+            <div 
+              onClick={() => {
+                if (setView && selectedFlat?.details.unit) {
+                  const unitStr = selectedFlat.details.unit.trim().toUpperCase();
+                  
+                  // Check for A, B, C anywhere in the string or Bangla equivalents
+                  if (unitStr.includes('A') || unitStr.includes('এ')) {
+                    setView('UNIT_A');
+                  } else if (unitStr.includes('B') || unitStr.includes('বি')) {
+                    setView('UNIT_B');
+                  } else if (unitStr.includes('C') || unitStr.includes('সি')) {
+                    setView('UNIT_C');
+                  } else {
+                    setView('GALLERY_DETAIL', { id: galleryCategoryId });
+                  }
+                }
+              }}
+              className="bg-gradient-to-br from-red-600 to-red-800 text-white p-4 rounded-xl mt-[18px] font-extrabold text-lg flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transition-shadow active:scale-[0.98] cursor-pointer"
+              style={{ fontFamily: '"Noto Sans Bengali", Inter, sans-serif' }}
+            >
+              <i className="fa-solid fa-camera-retro"></i> ফ্ল্যাটের ছবি দেখুন
+            </div>
+          )}
+
           {/* Owner Section */}
           <button 
             onClick={() => setShowOwnerDetails(!showOwnerDetails)}
