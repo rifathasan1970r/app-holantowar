@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Lock, Unlock, Plus, Trash2, Settings, X, ChevronLeft } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ViewState } from '../types';
 import { supabase } from '../lib/supabaseClient';
 
@@ -21,6 +22,8 @@ interface GalleryViewProps {
 }
 
 const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [categories, setCategories] = useState<GalleryCategory[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [pinInput, setPinInput] = useState('');
@@ -56,6 +59,13 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
     "কমিউনিটি হল রুম",
     "ইভেন্ট ও গেট টুগেদার"
   ];
+
+  useEffect(() => {
+    const isAdminParam = new URLSearchParams(location.search).get('admin');
+    if (isAdminParam === 'true') {
+      setIsAdmin(true);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     fetchCategories();
@@ -176,6 +186,11 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
       setIsAdmin(true);
       setShowPinModal(false);
       setPinInput('');
+      
+      // Update URL to include admin=true
+      const params = new URLSearchParams(location.search);
+      params.set('admin', 'true');
+      navigate({ search: params.toString() }, { replace: true });
     } else {
       alert('ভুল পিন! আবার চেষ্টা করুন।');
     }
@@ -376,7 +391,9 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
               <div className="flex flex-col gap-2">
                 <button 
                   onClick={() => {
-                    setView('GALLERY_DETAIL', { category: cat.en, admin: isAdmin ? 'true' : 'false' });
+                    const params: Record<string, string> = { category: cat.en };
+                    if (isAdmin) params.admin = 'true';
+                    setView('GALLERY_DETAIL', params);
                   }}
                   className="w-full bg-gradient-to-br from-[#4a69bd] to-[#6a82fb] rounded-[15px] p-[12px_20px] min-h-[70px] text-white shadow-[0_5px_20px_rgba(74,105,189,0.4)] transition-all duration-300 flex items-center gap-[18px] hover:from-[#6a82fb] hover:to-[#4a69bd] hover:-translate-y-1 hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(74,105,189,0.6)]"
                 >
@@ -401,7 +418,11 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
                       {cat.is_locked ? <><Lock size={16} /> আনলক করুন</> : <><Unlock size={16} /> লক করুন</>}
                     </button>
                     <button 
-                      onClick={() => setView('GALLERY_DETAIL', { category: cat.en, admin: isAdmin ? 'true' : 'false' })}
+                      onClick={() => {
+                        const params: Record<string, string> = { category: cat.en };
+                        if (isAdmin) params.admin = 'true';
+                        setView('GALLERY_DETAIL', params);
+                      }}
                       className="flex-1 flex items-center justify-center gap-2 p-2 bg-blue-50 text-blue-600 rounded-xl text-sm font-bold hover:bg-blue-100"
                     >
                       <Plus size={16} /> ছবি যোগ করুন

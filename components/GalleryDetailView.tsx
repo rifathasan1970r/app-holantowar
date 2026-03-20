@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, X, Lock, Unlock, Settings, Edit, Video, ChevronRight } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import FlatInteriorView from './FlatInteriorView';
 import { ViewState } from '../types';
@@ -23,6 +23,7 @@ interface GalleryDetailViewProps {
 
 const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [category, setCategory] = useState<GalleryCategory | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -126,16 +127,35 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
     }
   };
 
-  const handleBack = () => {
+  const handleBack = async () => {
     if (category?.en.startsWith('SUB_EVENT:')) {
       const parentId = category.en.split(':')[1];
+      
+      // Try to find the parent's English name for a cleaner URL
+      const { data: parentData } = await supabase
+        .from('gallery_categories')
+        .select('en')
+        .eq('id', parentId)
+        .single();
+      
+      const effectiveParentId = parentData?.en || parentId;
+
       if (setView) {
-        setView('GALLERY_DETAIL', { category: parentId, admin: isAdmin ? 'true' : 'false' });
+        const params: Record<string, string> = { category: effectiveParentId };
+        if (isAdmin) params.admin = 'true';
+        setView('GALLERY_DETAIL', params);
+      } else {
+        const adminStr = isAdmin ? '&admin=true' : '';
+        window.location.search = `?category=${effectiveParentId}${adminStr}`;
+      }
+    } else {
+      if (setView) {
+        const params: Record<string, string> = {};
+        if (isAdmin) params.admin = 'true';
+        setView('GALLERY', params);
       } else {
         onBack();
       }
-    } else {
-      onBack();
     }
   };
 
@@ -387,6 +407,11 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
       setIsAdmin(true);
       setShowPinModal(false);
       setPin('');
+      
+      // Update URL to include admin=true
+      const params = new URLSearchParams(location.search);
+      params.set('admin', 'true');
+      navigate({ search: params.toString() }, { replace: true });
     } else {
       alert('ভুল পিন! আবার চেষ্টা করুন।');
       setPin('');
@@ -468,9 +493,12 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
                     <button 
                       onClick={() => {
                         if (setView) {
-                          setView('GALLERY_DETAIL', { category: event.id, admin: isAdmin ? 'true' : 'false' });
+                          const params: Record<string, string> = { category: event.en };
+                          if (isAdmin) params.admin = 'true';
+                          setView('GALLERY_DETAIL', params);
                         } else {
-                          window.location.search = `?category=${event.id}&admin=${isAdmin ? 'true' : 'false'}`;
+                          const adminStr = isAdmin ? '&admin=true' : '';
+                          window.location.search = `?category=${event.en}${adminStr}`;
                         }
                       }}
                       className="flex-1 p-3.5 flex items-center gap-3.5 hover:bg-gray-50/50 transition-colors text-left min-w-0"
