@@ -40,7 +40,10 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
   const [newEvent, setNewEvent] = useState({ bn: '', date: '' });
   const [editingSubEvent, setEditingSubEvent] = useState<{ id: string, bn: string, date: string } | null>(null);
 
-  const categoryId = new URLSearchParams(location.search).get('id');
+  const categoryParam = new URLSearchParams(location.search).get('category');
+  const urlCategoryId = new URLSearchParams(location.search).get('id');
+  const effectiveId = categoryParam || urlCategoryId;
+  const categoryId = category?.id;
   const isAdminParam = new URLSearchParams(location.search).get('admin');
   const unitParam = new URLSearchParams(location.search).get('unit');
 
@@ -52,11 +55,11 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
 
   useEffect(() => {
     fetchMainSlider();
-    if (categoryId) {
+    if (effectiveId) {
       fetchCategory();
       
       const channel = supabase
-        .channel(`category_${categoryId}`)
+        .channel(`category_${effectiveId}`)
         .on('postgres_changes', { 
           event: '*', 
           schema: 'public', 
@@ -70,7 +73,7 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
         supabase.removeChannel(channel);
       };
     }
-  }, [categoryId]);
+  }, [effectiveId]);
 
   const fetchMainSlider = async () => {
     const { data } = await supabase
@@ -84,16 +87,23 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
   };
 
   const fetchCategory = async () => {
-    if (!categoryId) return;
-    const { data, error } = await supabase
-      .from('gallery_categories')
-      .select('*')
-      .eq('id', categoryId)
-      .single();
+    if (!effectiveId) return;
+    
+    // Try to fetch by ID if it looks like a UUID, otherwise try by English name
+    const isUUID = /^[0-9a-fA-F-]{36}$/.test(effectiveId);
+    let query = supabase.from('gallery_categories').select('*');
+    
+    if (isUUID) {
+      query = query.or(`id.eq.${effectiveId},en.eq."${effectiveId}"`);
+    } else {
+      query = query.eq('en', effectiveId);
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
       console.error('Error fetching category:', error);
-    } else {
+    } else if (data) {
       setCategory(data);
       if (data.en === 'Events & Gatherings') {
         fetchSubEvents(data.id);
@@ -120,7 +130,7 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
     if (category?.en.startsWith('SUB_EVENT:')) {
       const parentId = category.en.split(':')[1];
       if (setView) {
-        setView('GALLERY_DETAIL', { id: parentId, admin: isAdmin ? 'true' : 'false' });
+        setView('GALLERY_DETAIL', { category: parentId, admin: isAdmin ? 'true' : 'false' });
       } else {
         onBack();
       }
@@ -458,9 +468,9 @@ const GalleryDetailView: React.FC<GalleryDetailViewProps> = ({ onBack, setView }
                     <button 
                       onClick={() => {
                         if (setView) {
-                          setView('GALLERY_DETAIL', { id: event.id, admin: isAdmin ? 'true' : 'false' });
+                          setView('GALLERY_DETAIL', { category: event.id, admin: isAdmin ? 'true' : 'false' });
                         } else {
-                          window.location.search = `?id=${event.id}&admin=${isAdmin ? 'true' : 'false'}`;
+                          window.location.search = `?category=${event.id}&admin=${isAdmin ? 'true' : 'false'}`;
                         }
                       }}
                       className="flex-1 p-3.5 flex items-center gap-3.5 hover:bg-gray-50/50 transition-colors text-left min-w-0"

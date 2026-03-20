@@ -376,7 +376,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
               <div className="flex flex-col gap-2">
                 <button 
                   onClick={() => {
-                    setView('GALLERY_DETAIL', { id: cat.id, admin: isAdmin ? 'true' : 'false' });
+                    setView('GALLERY_DETAIL', { category: cat.en, admin: isAdmin ? 'true' : 'false' });
                   }}
                   className="w-full bg-gradient-to-br from-[#4a69bd] to-[#6a82fb] rounded-[15px] p-[12px_20px] min-h-[70px] text-white shadow-[0_5px_20px_rgba(74,105,189,0.4)] transition-all duration-300 flex items-center gap-[18px] hover:from-[#6a82fb] hover:to-[#4a69bd] hover:-translate-y-1 hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(74,105,189,0.6)]"
                 >
@@ -401,7 +401,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ onBack, setView }) => {
                       {cat.is_locked ? <><Lock size={16} /> আনলক করুন</> : <><Unlock size={16} /> লক করুন</>}
                     </button>
                     <button 
-                      onClick={() => setView('GALLERY_DETAIL', { id: cat.id, admin: isAdmin ? 'true' : 'false' })}
+                      onClick={() => setView('GALLERY_DETAIL', { category: cat.en, admin: isAdmin ? 'true' : 'false' })}
                       className="flex-1 flex items-center justify-center gap-2 p-2 bg-blue-50 text-blue-600 rounded-xl text-sm font-bold hover:bg-blue-100"
                     >
                       <Plus size={16} /> ছবি যোগ করুন

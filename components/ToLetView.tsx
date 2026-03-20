@@ -37,7 +37,7 @@ export const ToLetView = ({ setView }: { setView?: (view: string, params?: any) 
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [showOwnerDetails, setShowOwnerDetails] = useState(false);
-  const [galleryCategoryId, setGalleryCategoryId] = useState<string | null>(null);
+  const [galleryCategoryName, setGalleryCategoryName] = useState<string | null>(null);
   const [newFlat, setNewFlat] = useState({
     floor: '',
     unit: '',
@@ -105,10 +105,10 @@ export const ToLetView = ({ setView }: { setView?: (view: string, params?: any) 
     const fetchGalleryCategory = async () => {
       const { data, error } = await supabase
         .from('gallery_categories')
-        .select('id')
+        .select('en')
         .eq('en', 'Flat Interior View')
         .single();
-      if (data) setGalleryCategoryId(data.id);
+      if (data) setGalleryCategoryName(data.en);
     };
     fetchGalleryCategory();
 
@@ -397,7 +397,7 @@ export const ToLetView = ({ setView }: { setView?: (view: string, params?: any) 
           </div>
 
           {/* New Box: See Flat Pictures */}
-          {galleryCategoryId && (
+          {galleryCategoryName && (
             <div 
               onClick={() => {
                 if (setView && selectedFlat?.details.unit) {
@@ -411,7 +411,7 @@ export const ToLetView = ({ setView }: { setView?: (view: string, params?: any) 
                   } else if (unitStr.includes('C') || unitStr.includes('সি')) {
                     setView('UNIT_C');
                   } else {
-                    setView('GALLERY_DETAIL', { id: galleryCategoryId });
+                    setView('GALLERY_DETAIL', { category: galleryCategoryName });
                   }
                 }
               }}
