@@ -9,6 +9,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import { useLocalStorage } from '../src/hooks/useLocalStorage';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 // কনফিগারেশন: ২৭টি ইউনিট (ফ্লোর ২ থেকে ১০)
 const FLOORS = [2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -84,6 +85,8 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
   showSummaryList,
   onSummaryToggle
 }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [showMonthlySummary, setShowMonthlySummary] = useState<boolean>(false);
   const [showDueSummary, setShowDueSummary] = useState<boolean>(false);
   const [dueSummaryData, setDueSummaryData] = useState<{unit: string, due2025: number, due2026: number}[]>([]);
@@ -96,6 +99,38 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
   const [showFullYearTable, setShowFullYearTable] = useState<boolean>(false);
   const [fullYearTableUnitFilter, setFullYearTableUnitFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Sync view state with URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const section = params.get('section');
+    if (section === 'monthly-summary') setShowMonthlySummary(true);
+    else if (section === 'due-summary') setShowDueSummary(true);
+    else if (section === 'parking-charge') setShowParkingView(true);
+    else if (section === 'full-year-table') setShowFullYearTable(true);
+  }, []);
+
+  // Update URL when state changes
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    let newSection = null;
+    if (showMonthlySummary) newSection = 'monthly-summary';
+    else if (showDueSummary) newSection = 'due-summary';
+    else if (showParkingView) newSection = 'parking-charge';
+    else if (showFullYearTable) newSection = 'full-year-table';
+
+    if (newSection) {
+        if (params.get('section') !== newSection) {
+            params.set('section', newSection);
+            navigate({ search: params.toString() }, { replace: true });
+        }
+    } else {
+        if (params.has('section')) {
+            params.delete('section');
+            navigate({ search: params.toString() }, { replace: true });
+        }
+    }
+  }, [showMonthlySummary, showDueSummary, showParkingView, showFullYearTable]);
   
   // Supabase State
   const [dbData, setDbData] = useState<PaymentData[]>([]);
