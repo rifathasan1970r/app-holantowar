@@ -226,6 +226,7 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
         setShowDueSummary(true);
         if (unit) onUnitSelect(unit);
         if (year) setSelectedYear(parseInt(year));
+        fetchDueSummaryData();
     }
     else if (section === 'parking-charge') {
         if (mode === 'select') {
@@ -406,9 +407,18 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
     fetchData();
   }, [selectedYear]);
 
+  useEffect(() => {
+    if (showDueSummary) {
+      fetchDueSummaryData();
+    }
+  }, [viewMode, showDueSummary]);
+
   const fetchDueSummaryData = async () => {
     setLoadingDueSummary(true);
     try {
+      const isParking = viewMode === 'PARKING';
+      
+      // Fetch payments
       const { data, error } = await supabase
         .from('payments')
         .select('*')
@@ -416,9 +426,64 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
       
       if (error) throw error;
 
+      // Fetch units_info to ensure we have the latest occupancy/parking info
+      const { data: uData, error: uError } = await supabase
+        .from('units_info')
+        .select('*');
+      
+      const currentUnitsInfo = { ...unitsInfo };
+      let currentParkingUnits = [...parkingUnits];
+      let currentExternalUnits = [...externalUnits];
+
+      if (!uError && uData) {
+          uData.forEach((u: any) => {
+              const isParkingConfig = u.unit_text === '_PARKING_CONFIG_' && u.year_num === selectedYear;
+              const isCompositeParkingConfig = u.unit_text === `_PARKING_CONFIG_${selectedYear}`;
+
+              if (isParkingConfig || isCompositeParkingConfig) {
+                  try {
+                      if (u.note) {
+                          const parsed = JSON.parse(u.note);
+                          if (Array.isArray(parsed)) {
+                              currentParkingUnits = parsed;
+                          } else if (typeof parsed === 'object') {
+                              currentParkingUnits = parsed.selectedStandardUnits || [];
+                              currentExternalUnits = parsed.externalUnits || [];
+                          }
+                      }
+                  } catch (e) {}
+                  return;
+              }
+
+              const key = u.year_num ? `${u.unit_text}-${u.year_num}` : u.unit_text;
+              currentUnitsInfo[key] = { 
+                  unit_text: u.unit_text,
+                  is_occupied: u.is_occupied, 
+                  note: u.note || '',
+                  phone: u.phone || '',
+                  confirm_template: u.confirm_template || '',
+                  due_template: u.due_template || '',
+                  owner_phone: u.owner_phone || '',
+                  owner_confirm_template: u.owner_confirm_template || '',
+                  owner_due_template: u.owner_due_template || '',
+                  year_num: u.year_num
+              };
+          });
+      }
+
+      // Filter data based on viewMode
+      const filteredData = data?.filter(d => {
+          const isParkingUnit = d.unit_text.endsWith('_P');
+          return isParking ? isParkingUnit : !isParkingUnit;
+      });
+
       const summaryMap: Record<string, { due2025: number, due2026: number }> = {};
       
-      ALL_UNITS.forEach(unit => {
+      const targetUnits = isParking 
+        ? [...currentParkingUnits, ...currentExternalUnits.map(u => u.id)]
+        : ALL_UNITS;
+
+      targetUnits.forEach(unit => {
         summaryMap[unit] = { due2025: 0, due2026: 0 };
       });
 
@@ -426,18 +491,41 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
       const currentRealYear = now.getFullYear();
       const currentRealMonthIdx = now.getMonth();
 
-      ALL_UNITS.forEach(unit => {
-        const isOccupiedDefault = unit.slice(-1) !== 'B';
+      targetUnits.forEach(unit => {
+        const dbUnitText = isParking ? (unit.endsWith('_P') ? unit : `${unit}_P`) : unit;
         
         [2025, 2026].forEach(year => {
           const uInfoKey = `${unit}-${year}`;
-          const uInfo = unitsInfo[uInfoKey] || unitsInfo[unit];
-          const isOccupied = uInfo?.is_occupied ?? isOccupiedDefault;
-          const defaultAmount = isOccupied ? 2000 : 500;
+          const uInfo = currentUnitsInfo[uInfoKey] || currentUnitsInfo[unit];
+          
+          let defaultAmount = 0;
+          if (isParking) {
+              const info = currentUnitsInfo[unit] || currentUnitsInfo[`${unit}-${year}`];
+              let pType: 'MOTORCYCLE' | 'CAR' = 'CAR';
+              let oType: 'OWNER' | 'TENANT' | 'EXTERNAL' = 'TENANT';
+              
+              if (info?.note) {
+                  try {
+                      const parsed = JSON.parse(info.note);
+                      pType = parsed.parkingType || 'CAR';
+                      oType = parsed.ownershipType || 'TENANT';
+                  } catch (e) {}
+              }
+              
+              if (currentExternalUnits.some(eu => eu.id === unit)) {
+                  oType = 'EXTERNAL';
+              }
+              
+              defaultAmount = getParkingAmount(pType, oType);
+          } else {
+              const isOccupiedDefault = unit.slice(-1) !== 'B';
+              const isOccupied = uInfo?.is_occupied ?? isOccupiedDefault;
+              defaultAmount = isOccupied ? 2000 : 500;
+          }
 
           MONTHS_LOGIC.forEach((month, index) => {
-            const paymentRecord = data?.find(
-              d => d.unit_text === unit && d.month_name === month && d.year_num === year
+            const paymentRecord = filteredData?.find(
+              d => d.unit_text === dbUnitText && d.month_name === month && d.year_num === year
             );
 
             if (paymentRecord) {
@@ -454,7 +542,7 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
         });
       });
 
-      const result = ALL_UNITS.map(unit => ({
+      const result = targetUnits.map(unit => ({
         unit,
         due2025: summaryMap[unit].due2025,
         due2026: summaryMap[unit].due2026
@@ -3800,7 +3888,9 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
                   <ArrowLeft size={20} />
                 </button>
                 <div className="flex-1">
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">বকেয়া সামারি</h2>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">
+                        {viewMode === 'PARKING' ? 'পার্কিং চার্জ বকেয়া সামারি' : 'সার্ভিস চার্জ বকেয়া সামারি'}
+                    </h2>
                     <p className="text-xs text-primary-600 dark:text-primary-400 font-medium">২০২৫ ও ২০২৬ সাল</p>
                 </div>
              </div>
