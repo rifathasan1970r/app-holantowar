@@ -185,6 +185,16 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
   const [smsSelectedUnits, setSmsSelectedUnits] = useState<string[]>(ALL_UNITS);
   const [smsSentUnits, setSmsSentUnits] = useState<string[]>([]);
   const [isSendingSms, setIsSendingSms] = useState(false);
+  const [selectedMonthStat, setSelectedMonthStat] = useState<any>(null);
+  const [detailViewType, setDetailViewType] = useState<'SUMMARY' | 'PAID_LIST' | 'DUE_LIST'>('SUMMARY');
+
+
+  // Refresh data when switching to Parking mode or becoming Admin to ensure latest configuration is loaded
+  useEffect(() => {
+    if (viewMode === 'PARKING' || isAdmin) {
+        fetchData(false);
+    }
+  }, [viewMode, isAdmin]);
 
   // Sync view state with URL
   useEffect(() => {
@@ -197,10 +207,21 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
     if (section === 'monthly-summary') {
         setShowMonthlySummary(true);
         if (year) setSelectedYear(parseInt(year));
+        const month = params.get('month');
+        const detailType = params.get('detailType');
+        if (month && detailType) {
+            // Need to find the stat object based on month name
+            const stat = monthlyStats.find(s => s.month === month);
+            if (stat) {
+                setSelectedMonthStat(stat);
+                setDetailViewType(detailType as 'SUMMARY' | 'PAID_LIST' | 'DUE_LIST');
+            }
+        }
     }
     else if (section === 'due-summary') {
         setShowDueSummary(true);
         if (unit) onUnitSelect(unit);
+        if (year) setSelectedYear(parseInt(year));
     }
     else if (section === 'parking-charge') {
         setShowParkingView(true);
@@ -230,21 +251,33 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
     if (newSection) {
         if (params.get('section') !== newSection) {
             params.set('section', newSection);
-            if (newSection === 'monthly-summary') params.set('year', selectedYear.toString());
+            if (newSection === 'monthly-summary' || newSection === 'due-summary') params.set('year', selectedYear.toString());
             else params.delete('year');
             
             if (newSection === 'due-summary' && selectedUnit) params.set('unit', selectedUnit);
             else params.delete('unit');
 
+            if (newSection === 'monthly-summary' && selectedMonthStat) {
+                params.set('month', selectedMonthStat.month);
+                params.set('detailType', detailViewType);
+            } else {
+                params.delete('month');
+                params.delete('detailType');
+            }
+
             if (newSection === 'parking-charge') params.set('mode', viewMode.toLowerCase());
             else params.delete('mode');
             
             navigate({ search: params.toString() }, { replace: true });
-        } else if (newSection === 'monthly-summary' && params.get('year') !== selectedYear.toString()) {
+        } else if ((newSection === 'monthly-summary' || newSection === 'due-summary') && params.get('year') !== selectedYear.toString()) {
             params.set('year', selectedYear.toString());
             navigate({ search: params.toString() }, { replace: true });
         } else if (newSection === 'due-summary' && selectedUnit && params.get('unit') !== selectedUnit) {
             params.set('unit', selectedUnit);
+            navigate({ search: params.toString() }, { replace: true });
+        } else if (newSection === 'monthly-summary' && selectedMonthStat && (params.get('month') !== selectedMonthStat.month || params.get('detailType') !== detailViewType)) {
+            params.set('month', selectedMonthStat.month);
+            params.set('detailType', detailViewType);
             navigate({ search: params.toString() }, { replace: true });
         } else if (newSection === 'parking-charge' && params.get('mode') !== viewMode.toLowerCase()) {
             params.set('mode', viewMode.toLowerCase());
@@ -256,17 +289,12 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
             params.delete('year');
             params.delete('unit');
             params.delete('mode');
+            params.delete('month');
+            params.delete('detailType');
             navigate({ search: params.toString() }, { replace: true });
         }
     }
-  }, [showMonthlySummary, showDueSummary, showParkingView, showFullYearTable, showWhatsAppView, showSmsSender, showAIAssistant, showLogin, selectedYear, selectedUnit, viewMode]);
-
-  // Refresh data when switching to Parking mode or becoming Admin to ensure latest configuration is loaded
-  useEffect(() => {
-    if (viewMode === 'PARKING' || isAdmin) {
-        fetchData(false);
-    }
-  }, [viewMode, isAdmin]);
+  }, [showMonthlySummary, showDueSummary, showParkingView, showFullYearTable, showWhatsAppView, showSmsSender, showAIAssistant, showLogin, selectedYear, selectedUnit, viewMode, selectedMonthStat, detailViewType]);
 
   // Fetch data from Supabase
   const fetchData = async (showLoading = true, fetchUnitsInfo = true) => {
@@ -1013,8 +1041,6 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
     });
   }, [selectedYear, dbData, unitsInfo, lang, viewMode, visibleUnits, externalUnits]);
 
-  const [selectedMonthStat, setSelectedMonthStat] = useState<any>(null);
-  const [detailViewType, setDetailViewType] = useState<'SUMMARY' | 'PAID_LIST' | 'DUE_LIST'>('SUMMARY');
   const [selectedUnitSummary, setSelectedUnitSummary] = useState<any>(null);
   const [showYearlySummary, setShowYearlySummary] = useState<boolean>(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
@@ -1733,7 +1759,13 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
 
         <div className="space-y-4">
           {/* Option 1 */}
-          <button className="w-full bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between group active:scale-[0.98] transition-all hover:border-primary-500 dark:hover:border-primary-400">
+          <button 
+            onClick={() => {
+                setViewMode('SERVICE');
+                setShowParkingView(true);
+            }}
+            className="w-full bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between group active:scale-[0.98] transition-all hover:border-primary-500 dark:hover:border-primary-400"
+          >
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Wallet size={24} />
@@ -1750,7 +1782,7 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
           <button 
             onClick={() => {
                 setViewMode('PARKING');
-                setShowParkingView(false);
+                setShowParkingView(true);
             }}
             className="w-full bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between group active:scale-[0.98] transition-all hover:border-orange-500 dark:hover:border-orange-400"
           >
@@ -3762,6 +3794,22 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
                  </div>
              ) : (
                  <>
+                     {/* Year Selection Tabs */}
+                     <div className="bg-white dark:bg-slate-800 p-1 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex mb-6">
+                        <button 
+                            onClick={() => setSelectedYear(2025)}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all ${selectedYear === 2025 ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                        >
+                            <CalendarDays size={16} /> 2025
+                        </button>
+                        <button 
+                            onClick={() => setSelectedYear(2026)}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all ${selectedYear === 2026 ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                        >
+                            <CalendarDays size={16} /> 2026
+                        </button>
+                    </div>
+
                      {/* Summary Box */}
                      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 mb-6">
                          <div className="grid grid-cols-2 gap-3 mb-3">
