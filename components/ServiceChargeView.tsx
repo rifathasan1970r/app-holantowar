@@ -264,7 +264,7 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
       if (newSection) {
           if (params.get('section') !== newSection || (newSection === 'parking-charge' && params.get('mode') !== (showParkingView ? 'select' : viewMode.toLowerCase()))) {
               params.set('section', newSection);
-              if (newSection === 'monthly-summary' || newSection === 'due-summary' || newSection === 'unit-detail' || newSection === 'full-year-table') params.set('year', selectedYear.toString());
+              if (newSection === 'monthly-summary' || newSection === 'unit-detail' || newSection === 'full-year-table') params.set('year', selectedYear.toString());
               else params.delete('year');
               
               if ((newSection === 'due-summary' || newSection === 'unit-detail') && selectedUnit) params.set('unit', selectedUnit);
@@ -286,7 +286,7 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
               }
               
               navigate({ search: params.toString() }, { replace: true });
-          } else if ((newSection === 'monthly-summary' || newSection === 'due-summary' || newSection === 'unit-detail' || newSection === 'full-year-table') && params.get('year') !== selectedYear.toString()) {
+          } else if ((newSection === 'monthly-summary' || newSection === 'unit-detail' || newSection === 'full-year-table') && params.get('year') !== selectedYear.toString()) {
               params.set('year', selectedYear.toString());
               navigate({ search: params.toString() }, { replace: true });
           } else if ((newSection === 'due-summary' || newSection === 'unit-detail') && selectedUnit && params.get('unit') !== selectedUnit) {
@@ -3811,22 +3811,6 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
                  </div>
              ) : (
                  <>
-                     {/* Year Selection Tabs */}
-                     <div className="bg-white dark:bg-slate-800 p-1 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex mb-6">
-                        <button 
-                            onClick={() => setSelectedYear(2025)}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all ${selectedYear === 2025 ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                        >
-                            <CalendarDays size={16} /> 2025
-                        </button>
-                        <button 
-                            onClick={() => setSelectedYear(2026)}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all ${selectedYear === 2026 ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                        >
-                            <CalendarDays size={16} /> 2026
-                        </button>
-                    </div>
-
                      {/* Summary Box */}
                      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 mb-6">
                          <div className="grid grid-cols-2 gap-3 mb-3">
