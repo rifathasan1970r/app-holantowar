@@ -218,83 +218,100 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
             }
         }
     }
+    else if (section === 'unit-detail') {
+        if (unit) onUnitSelect(unit);
+        if (year) setSelectedYear(parseInt(year));
+    }
     else if (section === 'due-summary') {
         setShowDueSummary(true);
         if (unit) onUnitSelect(unit);
         if (year) setSelectedYear(parseInt(year));
     }
     else if (section === 'parking-charge') {
-        setShowParkingView(true);
-        if (mode === 'parking') setViewMode('PARKING');
-        else setViewMode('SERVICE');
+        if (mode === 'select') {
+            setShowParkingView(true);
+        } else {
+            setShowParkingView(false);
+            if (mode === 'parking') setViewMode('PARKING');
+            else setViewMode('SERVICE');
+        }
     }
-    else if (section === 'full-year-table') setShowFullYearTable(true);
+    else if (section === 'full-year-table') {
+        setShowFullYearTable(true);
+        if (unit) setFullYearTableUnitFilter(unit);
+        if (year) setSelectedYear(parseInt(year));
+    }
     else if (section === 'whatsapp-view') setShowWhatsAppView(true);
     else if (section === 'sms-sender') setShowSmsSender(true);
     else if (section === 'ai-assistant') setShowAIAssistant(true);
     else if (section === 'admin-login') setShowLogin(true);
   }, []);
 
-  // Update URL when state changes
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    let newSection = null;
-    if (showMonthlySummary) newSection = 'monthly-summary';
-    else if (showDueSummary) newSection = 'due-summary';
-    else if (showParkingView) newSection = 'parking-charge';
-    else if (showFullYearTable) newSection = 'full-year-table';
-    else if (showWhatsAppView) newSection = 'whatsapp-view';
-    else if (showSmsSender) newSection = 'sms-sender';
-    else if (showAIAssistant) newSection = 'ai-assistant';
-    else if (showLogin) newSection = 'admin-login';
-
-    if (newSection) {
-        if (params.get('section') !== newSection) {
-            params.set('section', newSection);
-            if (newSection === 'monthly-summary' || newSection === 'due-summary') params.set('year', selectedYear.toString());
-            else params.delete('year');
-            
-            if (newSection === 'due-summary' && selectedUnit) params.set('unit', selectedUnit);
-            else params.delete('unit');
-
-            if (newSection === 'monthly-summary' && selectedMonthStat) {
-                params.set('month', selectedMonthStat.month);
-                params.set('detailType', detailViewType);
-            } else {
-                params.delete('month');
-                params.delete('detailType');
-            }
-
-            if (newSection === 'parking-charge') params.set('mode', viewMode.toLowerCase());
-            else params.delete('mode');
-            
-            navigate({ search: params.toString() }, { replace: true });
-        } else if ((newSection === 'monthly-summary' || newSection === 'due-summary') && params.get('year') !== selectedYear.toString()) {
-            params.set('year', selectedYear.toString());
-            navigate({ search: params.toString() }, { replace: true });
-        } else if (newSection === 'due-summary' && selectedUnit && params.get('unit') !== selectedUnit) {
-            params.set('unit', selectedUnit);
-            navigate({ search: params.toString() }, { replace: true });
-        } else if (newSection === 'monthly-summary' && selectedMonthStat && (params.get('month') !== selectedMonthStat.month || params.get('detailType') !== detailViewType)) {
-            params.set('month', selectedMonthStat.month);
-            params.set('detailType', detailViewType);
-            navigate({ search: params.toString() }, { replace: true });
-        } else if (newSection === 'parking-charge' && params.get('mode') !== viewMode.toLowerCase()) {
-            params.set('mode', viewMode.toLowerCase());
-            navigate({ search: params.toString() }, { replace: true });
-        }
-    } else {
-        if (params.has('section')) {
-            params.delete('section');
-            params.delete('year');
-            params.delete('unit');
-            params.delete('mode');
-            params.delete('month');
-            params.delete('detailType');
-            navigate({ search: params.toString() }, { replace: true });
-        }
-    }
-  }, [showMonthlySummary, showDueSummary, showParkingView, showFullYearTable, showWhatsAppView, showSmsSender, showAIAssistant, showLogin, selectedYear, selectedUnit, viewMode, selectedMonthStat, detailViewType]);
+    // Update URL when state changes
+    useEffect(() => {
+      const params = new URLSearchParams(location.search);
+      let newSection = null;
+      if (showFullYearTable) newSection = 'full-year-table';
+      else if (showParkingView || viewMode === 'PARKING') newSection = 'parking-charge';
+      else if (selectedUnit) newSection = 'unit-detail';
+      else if (showSmsSender) newSection = 'sms-sender';
+      else if (showWhatsAppView) newSection = 'whatsapp-view';
+      else if (showDueSummary) newSection = 'due-summary';
+      else if (showMonthlySummary) newSection = 'monthly-summary';
+      else if (showAIAssistant) newSection = 'ai-assistant';
+      else if (showLogin) newSection = 'admin-login';
+  
+      if (newSection) {
+          if (params.get('section') !== newSection || (newSection === 'parking-charge' && params.get('mode') !== (showParkingView ? 'select' : viewMode.toLowerCase()))) {
+              params.set('section', newSection);
+              if (newSection === 'monthly-summary' || newSection === 'due-summary' || newSection === 'unit-detail' || newSection === 'full-year-table') params.set('year', selectedYear.toString());
+              else params.delete('year');
+              
+              if ((newSection === 'due-summary' || newSection === 'unit-detail') && selectedUnit) params.set('unit', selectedUnit);
+              else if (newSection === 'full-year-table' && fullYearTableUnitFilter) params.set('unit', fullYearTableUnitFilter);
+              else params.delete('unit');
+  
+              if (newSection === 'monthly-summary' && selectedMonthStat) {
+                  params.set('month', selectedMonthStat.month);
+                  params.set('detailType', detailViewType);
+              } else {
+                  params.delete('month');
+                  params.delete('detailType');
+              }
+  
+              if (newSection === 'parking-charge') {
+                  params.set('mode', showParkingView ? 'select' : viewMode.toLowerCase());
+              } else {
+                  params.delete('mode');
+              }
+              
+              navigate({ search: params.toString() }, { replace: true });
+          } else if ((newSection === 'monthly-summary' || newSection === 'due-summary' || newSection === 'unit-detail' || newSection === 'full-year-table') && params.get('year') !== selectedYear.toString()) {
+              params.set('year', selectedYear.toString());
+              navigate({ search: params.toString() }, { replace: true });
+          } else if ((newSection === 'due-summary' || newSection === 'unit-detail') && selectedUnit && params.get('unit') !== selectedUnit) {
+              params.set('unit', selectedUnit);
+              navigate({ search: params.toString() }, { replace: true });
+          } else if (newSection === 'full-year-table' && fullYearTableUnitFilter && params.get('unit') !== fullYearTableUnitFilter) {
+              params.set('unit', fullYearTableUnitFilter);
+              navigate({ search: params.toString() }, { replace: true });
+          } else if (newSection === 'monthly-summary' && selectedMonthStat && (params.get('month') !== selectedMonthStat.month || params.get('detailType') !== detailViewType)) {
+              params.set('month', selectedMonthStat.month);
+              params.set('detailType', detailViewType);
+              navigate({ search: params.toString() }, { replace: true });
+          }
+      } else {
+          if (params.has('section')) {
+              params.delete('section');
+              params.delete('year');
+              params.delete('unit');
+              params.delete('mode');
+              params.delete('month');
+              params.delete('detailType');
+              navigate({ search: params.toString() }, { replace: true });
+          }
+      }
+    }, [showMonthlySummary, showDueSummary, showParkingView, showFullYearTable, showWhatsAppView, showSmsSender, showAIAssistant, showLogin, selectedYear, selectedUnit, viewMode, selectedMonthStat, detailViewType, fullYearTableUnitFilter]);
 
   // Fetch data from Supabase
   const fetchData = async (showLoading = true, fetchUnitsInfo = true) => {
@@ -1762,7 +1779,7 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
           <button 
             onClick={() => {
                 setViewMode('SERVICE');
-                setShowParkingView(true);
+                setShowParkingView(false);
             }}
             className="w-full bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between group active:scale-[0.98] transition-all hover:border-primary-500 dark:hover:border-primary-400"
           >
@@ -1782,7 +1799,7 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
           <button 
             onClick={() => {
                 setViewMode('PARKING');
-                setShowParkingView(true);
+                setShowParkingView(false);
             }}
             className="w-full bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between group active:scale-[0.98] transition-all hover:border-orange-500 dark:hover:border-orange-400"
           >
