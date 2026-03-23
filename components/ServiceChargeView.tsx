@@ -204,8 +204,9 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
     const unit = params.get('unit');
     const mode = params.get('mode');
     
-    if (section === 'monthly-summary') {
+    if (section === 'monthly-summary' || section === 'parking-monthly-summary') {
         setShowMonthlySummary(true);
+        if (section === 'parking-monthly-summary') setViewMode('PARKING');
         if (year) setSelectedYear(parseInt(year));
         const month = params.get('month');
         const detailType = params.get('detailType');
@@ -222,8 +223,9 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
         if (unit) onUnitSelect(unit);
         if (year) setSelectedYear(parseInt(year));
     }
-    else if (section === 'due-summary') {
+    else if (section === 'due-summary' || section === 'parking-due-summary') {
         setShowDueSummary(true);
+        if (section === 'parking-due-summary') setViewMode('PARKING');
         if (unit) onUnitSelect(unit);
         if (year) setSelectedYear(parseInt(year));
         fetchDueSummaryData();
@@ -237,8 +239,9 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
             else setViewMode('SERVICE');
         }
     }
-    else if (section === 'full-year-table') {
+    else if (section === 'full-year-table' || section === 'parking-full-year-table') {
         setShowFullYearTable(true);
+        if (section === 'parking-full-year-table') setViewMode('PARKING');
         if (unit) setFullYearTableUnitFilter(unit);
         if (year) setSelectedYear(parseInt(year));
     }
@@ -252,27 +255,27 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
     useEffect(() => {
       const params = new URLSearchParams(location.search);
       let newSection = null;
-      if (showFullYearTable) newSection = 'full-year-table';
+      if (showFullYearTable) newSection = viewMode === 'PARKING' ? 'parking-full-year-table' : 'full-year-table';
+      else if (showDueSummary) newSection = viewMode === 'PARKING' ? 'parking-due-summary' : 'due-summary';
+      else if (showMonthlySummary) newSection = viewMode === 'PARKING' ? 'parking-monthly-summary' : 'monthly-summary';
       else if (showParkingView || viewMode === 'PARKING') newSection = 'parking-charge';
       else if (selectedUnit) newSection = 'unit-detail';
       else if (showSmsSender) newSection = 'sms-sender';
       else if (showWhatsAppView) newSection = 'whatsapp-view';
-      else if (showDueSummary) newSection = 'due-summary';
-      else if (showMonthlySummary) newSection = 'monthly-summary';
       else if (showAIAssistant) newSection = 'ai-assistant';
       else if (showLogin) newSection = 'admin-login';
   
       if (newSection) {
           if (params.get('section') !== newSection || (newSection === 'parking-charge' && params.get('mode') !== (showParkingView ? 'select' : viewMode.toLowerCase()))) {
               params.set('section', newSection);
-              if (newSection === 'monthly-summary' || newSection === 'unit-detail' || newSection === 'full-year-table') params.set('year', selectedYear.toString());
+              if (newSection === 'monthly-summary' || newSection === 'parking-monthly-summary' || newSection === 'unit-detail' || newSection === 'full-year-table' || newSection === 'parking-full-year-table') params.set('year', selectedYear.toString());
               else params.delete('year');
               
-              if ((newSection === 'due-summary' || newSection === 'unit-detail') && selectedUnit) params.set('unit', selectedUnit);
-              else if (newSection === 'full-year-table' && fullYearTableUnitFilter) params.set('unit', fullYearTableUnitFilter);
+              if ((newSection === 'due-summary' || newSection === 'parking-due-summary' || newSection === 'unit-detail') && selectedUnit) params.set('unit', selectedUnit);
+              else if ((newSection === 'full-year-table' || newSection === 'parking-full-year-table') && fullYearTableUnitFilter) params.set('unit', fullYearTableUnitFilter);
               else params.delete('unit');
   
-              if (newSection === 'monthly-summary' && selectedMonthStat) {
+              if ((newSection === 'monthly-summary' || newSection === 'parking-monthly-summary') && selectedMonthStat) {
                   params.set('month', selectedMonthStat.month);
                   params.set('detailType', detailViewType);
               } else {
@@ -1198,7 +1201,7 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
             </button>
             <div className="flex-1">
                 <h2 className="text-xl font-bold text-slate-800 dark:text-white">
-                    {fullYearTableUnitFilter ? `${fullYearTableUnitFilter} এর ১২ মাসের তথ্য` : '১২ মাসের তথ্য'}
+                    {viewMode === 'PARKING' ? 'পার্কিং চার্জ ১২ মাসের তথ্য' : (fullYearTableUnitFilter ? `${fullYearTableUnitFilter} এর ১২ মাসের তথ্য` : '১২ মাসের তথ্য')}
                 </h2>
                 <p className="text-xs text-primary-600 dark:text-primary-400 font-medium">{selectedYear}</p>
             </div>
@@ -4008,7 +4011,9 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
                   <ArrowLeft size={20} />
                 </button>
                 <div className="flex-1">
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">মাসিক সামারি</h2>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">
+                        {viewMode === 'PARKING' ? 'পার্কিং চার্জ মাসিক সামারি' : 'সার্ভিস চার্জ মাসিক সামারি'}
+                    </h2>
                     <p className="text-xs text-primary-600 dark:text-primary-400 font-medium">{t.financialYear}: {selectedYear}</p>
                 </div>
              </div>
