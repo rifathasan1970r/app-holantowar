@@ -57,6 +57,8 @@ interface UnitInfo {
   owner_confirm_template?: string;
   owner_due_template?: string;
   year_num?: number;
+  parking_type?: 'MOTORCYCLE' | 'CAR';
+  is_owner?: boolean;
 }
 
 interface WhatsAppLog {
@@ -89,10 +91,20 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
   const navigate = useNavigate();
   const [showMonthlySummary, setShowMonthlySummary] = useState<boolean>(false);
   const [showDueSummary, setShowDueSummary] = useState<boolean>(false);
-  const [dueSummaryData, setDueSummaryData] = useState<{unit: string, due2025: number, due2026: number}[]>([]);
+  const [dueSummaryData, setDueSummaryData] = useState<{
+    unit: string, 
+    serviceDue2025: number, 
+    serviceDue2026: number, 
+    parkingDue2025: number, 
+    parkingDue2026: number,
+    sTotal2025: number,
+    sTotal2026: number,
+    pTotal2025: number,
+    pTotal2026: number
+  }[]>([]);
   const [loadingDueSummary, setLoadingDueSummary] = useState<boolean>(false);
   const [showParkingView, setShowParkingView] = useState<boolean>(false);
-  const [viewMode, setViewMode] = useState<'SERVICE' | 'PARKING'>('SERVICE');
+  const [viewMode, setViewMode] = useState<'SERVICE' | 'PARKING' | 'COMBINED'>('SERVICE');
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [selectedMonthForFullTable, setSelectedMonthForFullTable] = useState<number | null>(null);
@@ -419,9 +431,7 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
   const fetchDueSummaryData = async () => {
     setLoadingDueSummary(true);
     try {
-      const isParking = viewMode === 'PARKING';
-      
-      // Fetch payments
+      // Fetch all payments for 2025 and 2026
       const { data, error } = await supabase
         .from('payments')
         .select('*')
@@ -429,35 +439,14 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
       
       if (error) throw error;
 
-      // Fetch units_info to ensure we have the latest occupancy/parking info
+      // Fetch units_info for occupancy and parking settings
       const { data: uData, error: uError } = await supabase
         .from('units_info')
         .select('*');
       
       const currentUnitsInfo = { ...unitsInfo };
-      let currentParkingUnits = [...parkingUnits];
-      let currentExternalUnits = [...externalUnits];
-
       if (!uError && uData) {
           uData.forEach((u: any) => {
-              const isParkingConfig = u.unit_text === '_PARKING_CONFIG_' && u.year_num === selectedYear;
-              const isCompositeParkingConfig = u.unit_text === `_PARKING_CONFIG_${selectedYear}`;
-
-              if (isParkingConfig || isCompositeParkingConfig) {
-                  try {
-                      if (u.note) {
-                          const parsed = JSON.parse(u.note);
-                          if (Array.isArray(parsed)) {
-                              currentParkingUnits = parsed;
-                          } else if (typeof parsed === 'object') {
-                              currentParkingUnits = parsed.selectedStandardUnits || [];
-                              currentExternalUnits = parsed.externalUnits || [];
-                          }
-                      }
-                  } catch (e) {}
-                  return;
-              }
-
               const key = u.year_num ? `${u.unit_text}-${u.year_num}` : u.unit_text;
               currentUnitsInfo[key] = { 
                   unit_text: u.unit_text,
@@ -474,81 +463,132 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
           });
       }
 
-      // Filter data based on viewMode
-      const filteredData = data?.filter(d => {
-          const isParkingUnit = d.unit_text.endsWith('_P');
-          return isParking ? isParkingUnit : !isParkingUnit;
-      });
-
-      const summaryMap: Record<string, { due2025: number, due2026: number }> = {};
+      const summaryMap: Record<string, { 
+        serviceDue2025: number, 
+        serviceDue2026: number, 
+        parkingDue2025: number, 
+        parkingDue2026: number,
+        sTotal2025: number,
+        sTotal2026: number,
+        pTotal2025: number,
+        pTotal2026: number
+      }> = {};
       
-      const targetUnits = isParking 
-        ? [...currentParkingUnits, ...currentExternalUnits.map(u => u.id)]
-        : ALL_UNITS;
-
-      targetUnits.forEach(unit => {
-        summaryMap[unit] = { due2025: 0, due2026: 0 };
+      // Focus on 27 standard units
+      ALL_UNITS.forEach(unit => {
+        summaryMap[unit] = { 
+          serviceDue2025: 0, 
+          serviceDue2026: 0, 
+          parkingDue2025: 0, 
+          parkingDue2026: 0,
+          sTotal2025: 0,
+          sTotal2026: 0,
+          pTotal2025: 0,
+          pTotal2026: 0
+        };
       });
 
       const now = new Date();
       const currentRealYear = now.getFullYear();
       const currentRealMonthIdx = now.getMonth();
 
-      targetUnits.forEach(unit => {
-        const dbUnitText = isParking ? (unit.endsWith('_P') ? unit : `${unit}_P`) : unit;
-        
+      ALL_UNITS.forEach(unit => {
         [2025, 2026].forEach(year => {
           const uInfoKey = `${unit}-${year}`;
           const uInfo = currentUnitsInfo[uInfoKey] || currentUnitsInfo[unit];
           
-          let defaultAmount = 0;
-          if (isParking) {
-              const info = currentUnitsInfo[unit] || currentUnitsInfo[`${unit}-${year}`];
-              let pType: 'MOTORCYCLE' | 'CAR' = 'CAR';
-              let oType: 'OWNER' | 'TENANT' | 'EXTERNAL' = 'TENANT';
-              
-              if (info?.note) {
-                  try {
-                      const parsed = JSON.parse(info.note);
-                      pType = parsed.parkingType || 'CAR';
-                      oType = parsed.ownershipType || 'TENANT';
-                  } catch (e) {}
-              }
-              
-              if (currentExternalUnits.some(eu => eu.id === unit)) {
-                  oType = 'EXTERNAL';
-              }
-              
-              defaultAmount = getParkingAmount(pType, oType);
-          } else {
-              const isOccupiedDefault = unit.slice(-1) !== 'B';
-              const isOccupied = uInfo?.is_occupied ?? isOccupiedDefault;
-              defaultAmount = isOccupied ? 2000 : 500;
+          // 1. Service Charge Logic
+          const isOccupiedDefault = unit.slice(-1) !== 'B';
+          const isOccupied = uInfo?.is_occupied ?? isOccupiedDefault;
+          const serviceDefaultAmount = isOccupied ? 2000 : 500;
+
+          // 2. Parking Charge Logic
+          let parkingDefaultAmount = 0;
+          let pType: 'MOTORCYCLE' | 'CAR' = 'CAR';
+          let oType: 'OWNER' | 'TENANT' | 'EXTERNAL' = 'TENANT';
+          
+          if (uInfo?.note) {
+              try {
+                  const parsed = JSON.parse(uInfo.note);
+                  pType = parsed.parkingType || 'CAR';
+                  oType = parsed.ownershipType || 'TENANT';
+                  // If it's standard unit, it's either OWNER or TENANT
+              } catch (e) {}
           }
+          parkingDefaultAmount = getParkingAmount(pType, oType);
 
           MONTHS_LOGIC.forEach((month, index) => {
-            const paymentRecord = filteredData?.find(
-              d => d.unit_text === dbUnitText && d.month_name === month && d.year_num === year
+            // Check Service Payment
+            const servicePayment = data?.find(
+              d => d.unit_text === unit && d.month_name === month && d.year_num === year
+            );
+            
+            // Check Parking Payment
+            const parkingPayment = data?.find(
+              d => d.unit_text === `${unit}_P` && d.month_name === month && d.year_num === year
             );
 
-            if (paymentRecord) {
-              if (year === 2025) summaryMap[unit].due2025 += paymentRecord.due;
-              if (year === 2026) summaryMap[unit].due2026 += paymentRecord.due;
-            } else {
-              const isFuture = year > currentRealYear || (year === currentRealYear && index > currentRealMonthIdx);
-              if (!isFuture) {
-                if (year === 2025) summaryMap[unit].due2025 += defaultAmount;
-                if (year === 2026) summaryMap[unit].due2026 += defaultAmount;
+            const isFuture = year > currentRealYear || (year === currentRealYear && index > currentRealMonthIdx);
+
+            // Service Due
+            if (servicePayment) {
+              if (year === 2025) {
+                summaryMap[unit].serviceDue2025 += servicePayment.due;
+                summaryMap[unit].sTotal2025 += servicePayment.amount + servicePayment.due;
               }
+              if (year === 2026) {
+                summaryMap[unit].serviceDue2026 += servicePayment.due;
+                summaryMap[unit].sTotal2026 += servicePayment.amount + servicePayment.due;
+              }
+            } else if (!isFuture) {
+              if (year === 2025) {
+                summaryMap[unit].serviceDue2025 += serviceDefaultAmount;
+                summaryMap[unit].sTotal2025 += serviceDefaultAmount;
+              }
+              if (year === 2026) {
+                summaryMap[unit].serviceDue2026 += serviceDefaultAmount;
+                summaryMap[unit].sTotal2026 += serviceDefaultAmount;
+              }
+            }
+
+            // Parking Due (Only if it's a parking unit - we check if it has a parking record or if it's in parkingUnits)
+            // Actually, the user wants data for 27 units. If a unit doesn't have parking, its parking due should be 0.
+            // Let's check if it's in the parking list.
+            if (parkingUnits.includes(unit)) {
+                if (parkingPayment) {
+                  if (year === 2025) {
+                    summaryMap[unit].parkingDue2025 += parkingPayment.due;
+                    summaryMap[unit].pTotal2025 += parkingPayment.amount + parkingPayment.due;
+                  }
+                  if (year === 2026) {
+                    summaryMap[unit].parkingDue2026 += parkingPayment.due;
+                    summaryMap[unit].pTotal2026 += parkingPayment.amount + parkingPayment.due;
+                  }
+                } else if (!isFuture) {
+                  if (year === 2025) {
+                    summaryMap[unit].parkingDue2025 += parkingDefaultAmount;
+                    summaryMap[unit].pTotal2025 += parkingDefaultAmount;
+                  }
+                  if (year === 2026) {
+                    summaryMap[unit].parkingDue2026 += parkingDefaultAmount;
+                    summaryMap[unit].pTotal2026 += parkingDefaultAmount;
+                  }
+                }
             }
           });
         });
       });
 
-      const result = targetUnits.map(unit => ({
+      const result = ALL_UNITS.map(unit => ({
         unit,
-        due2025: summaryMap[unit].due2025,
-        due2026: summaryMap[unit].due2026
+        serviceDue2025: summaryMap[unit].serviceDue2025,
+        serviceDue2026: summaryMap[unit].serviceDue2026,
+        parkingDue2025: summaryMap[unit].parkingDue2025,
+        parkingDue2026: summaryMap[unit].parkingDue2026,
+        sTotal2025: summaryMap[unit].sTotal2025,
+        sTotal2026: summaryMap[unit].sTotal2026,
+        pTotal2025: summaryMap[unit].pTotal2025,
+        pTotal2026: summaryMap[unit].pTotal2026
       }));
 
       setDueSummaryData(result);
@@ -945,13 +985,30 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
   };
 
   // Generate Data
-  const getUnitData = (unit: string): MonthlyRecord[] => {
+  const getUnitData = (unit: string, modeOverride?: 'SERVICE' | 'PARKING' | 'COMBINED'): MonthlyRecord[] => {
+    const mode = modeOverride || viewMode;
+    
+    if (mode === 'COMBINED') {
+        const serviceData = getUnitData(unit, 'SERVICE');
+        const parkingData = getUnitData(unit, 'PARKING');
+        return serviceData.map((s, i) => {
+            const p = parkingData[i];
+            return {
+                ...s,
+                amount: s.amount + p.amount,
+                due: s.due + p.due,
+                status: (s.status === 'PAID' && p.status === 'PAID') ? 'PAID' : 
+                        (s.status === 'UPCOMING' && p.status === 'UPCOMING') ? 'UPCOMING' : 'DUE'
+            };
+        });
+    }
+
     const now = new Date();
     const currentRealYear = now.getFullYear();
     const currentRealMonthIdx = now.getMonth();
     
     // Determine the actual unit text to search in DB (e.g., '2A' or '2A_P')
-    const dbUnitText = viewMode === 'PARKING' ? `${unit}_P` : unit;
+    const dbUnitText = mode === 'PARKING' ? `${unit}_P` : unit;
 
     return MONTHS_LOGIC.map((month, index) => {
       let paymentRecord: PaymentData | undefined;
@@ -982,15 +1039,20 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
 
       // Default Amounts Logic
       let defaultAmount = 0;
-      if (viewMode === 'SERVICE') {
+      if (mode === 'SERVICE') {
           defaultAmount = (unit.slice(-1) !== 'B') ? 2000 : 500;
       } else {
-          // Parking Charge Default: Let's assume 0 for now, or maybe 500? 
-          // User didn't specify, so let's default to 0 due (meaning not applicable unless set)
-          // Or maybe 500 if they have a car? 
-          // Let's stick to 0 for now to be safe, or 500 if occupied?
-          // Actually, let's make it 0 and let admin set it.
-          defaultAmount = 0; 
+          // Parking Charge Default
+          const parkingType = unitsInfo[unit]?.parking_type || 'none';
+          const isOwner = unitsInfo[unit]?.is_owner || false;
+          
+          if (parkingType === 'CAR') {
+              defaultAmount = isOwner ? 500 : 1000;
+          } else if (parkingType === 'MOTORCYCLE') {
+              defaultAmount = 200;
+          } else {
+              defaultAmount = 0;
+          }
       }
 
       const isFuture = selectedYear > currentRealYear || (selectedYear === currentRealYear && index > currentRealMonthIdx);
@@ -1014,12 +1076,27 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
 
   const allUnitsSummary = useMemo(() => {
     return visibleUnits.map(unit => {
-        const records = getUnitData(unit);
-        const collected = records.reduce((sum, r) => sum + (r.status === 'PAID' ? r.amount : 0), 0);
-        const due = records.reduce((sum, r) => sum + r.due, 0);
-        return { unit, collected, due };
+        const sRecords = getUnitData(unit, 'SERVICE');
+        const pRecords = getUnitData(unit, 'PARKING');
+        
+        const sCollected = sRecords.reduce((sum, r) => sum + (r.status === 'PAID' || r.status === 'PARTIAL' ? r.amount : 0), 0);
+        const sDue = sRecords.reduce((sum, r) => sum + r.due, 0);
+        const sTotal = sRecords.reduce((sum, r) => sum + r.amount + r.due, 0);
+        
+        const pCollected = pRecords.reduce((sum, r) => sum + (r.status === 'PAID' || r.status === 'PARTIAL' ? r.amount : 0), 0);
+        const pDue = pRecords.reduce((sum, r) => sum + r.due, 0);
+        const pTotal = pRecords.reduce((sum, r) => sum + r.amount + r.due, 0);
+        
+        return { 
+            unit, 
+            sCollected, sDue, sTotal,
+            pCollected, pDue, pTotal,
+            collected: sCollected + pCollected,
+            due: sDue + pDue,
+            totalCharge: sTotal + pTotal
+        };
     });
-  }, [selectedYear, dbData, unitsInfo, lang, viewMode, visibleUnits]); // Added visibleUnits dependency
+  }, [selectedYear, dbData, unitsInfo, lang, viewMode, visibleUnits]);
 
   // New: 12-Month Aggregate Stats
   const monthlyStats = useMemo(() => {
@@ -1061,90 +1138,33 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
         const externalOwner = externalUnits.find(u => u.name === unit)?.owner;
         const ownerName = owner?.name || externalOwner || 'Unknown';
         
-        // We need to call getUnitData inside here, but getUnitData depends on state.
-        // Since getUnitData is defined in the component scope, we can use it.
-        // However, getUnitData is not memoized, so it might be re-created on every render.
-        // But since we are inside the component, it's fine.
-        // Wait, getUnitData uses selectedYear and dbData which are dependencies of this useMemo.
+        const sRecords = getUnitData(unit, 'SERVICE');
+        const pRecords = getUnitData(unit, 'PARKING');
         
-        // Let's copy the logic of getUnitData or just call it if it's stable enough.
-        // Actually, getUnitData is defined in the component body, so it's accessible.
-        // But to be safe and avoid stale closures if getUnitData changes (it doesn't seem to depend on anything that isn't in the dependency array of this useMemo),
-        // we should be fine.
+        const sTotalDue = sRecords.reduce((sum, r) => sum + r.due, 0);
+        const sTotalCharge = sRecords.reduce((sum, r) => sum + r.amount + r.due, 0);
+        const pTotalDue = pRecords.reduce((sum, r) => sum + r.due, 0);
+        const pTotalCharge = pRecords.reduce((sum, r) => sum + r.amount + r.due, 0);
         
-        // Re-implementing getUnitData logic here to be safe and efficient inside the loop
-        const now = new Date();
-        const currentRealYear = now.getFullYear();
-        const currentRealMonthIdx = now.getMonth();
-
-        // Determine the actual unit text to search in DB (e.g., '2A' or '2A_P')
-        const dbUnitText = viewMode === 'PARKING' ? `${unit}_P` : unit;
-
-        const records = MONTHS_LOGIC.map((month, index) => {
-            const paymentRecord = dbData.find(
-                d => d.unit_text === dbUnitText && d.month_name === month && d.year_num === selectedYear
-            );
-            
-            // Display month string
-            // const displayMonth = t.months[index]; // Not needed for calculation
-
-            if (paymentRecord) {
-                let recStatus = 'DUE';
-                if (paymentRecord.amount > 0 && paymentRecord.due > 0) recStatus = 'PARTIAL';
-                else if (paymentRecord.amount > 0) recStatus = 'PAID';
-                else if (paymentRecord.amount === 0 && paymentRecord.due === 0) recStatus = 'UPCOMING';
-
-                return {
-                    date: paymentRecord.paid_date || '-',
-                    amount: paymentRecord.amount,
-                    due: paymentRecord.due,
-                    status: recStatus
-                };
-            }
-
-            // Default Amount Logic for Summary
-            let defaultAmount = 0;
-            if (viewMode === 'SERVICE') {
-                defaultAmount = (unit.slice(-1) !== 'B') ? 2000 : 500;
-            } else {
-                defaultAmount = 500;
-            }
-
-            const isFuture = selectedYear > currentRealYear || (selectedYear === currentRealYear && index > currentRealMonthIdx);
-            
-            if (isFuture) {
-                return { date: '-', amount: 0, due: 0, status: 'UPCOMING' };
-            } else {
-                return { date: '-', amount: 0, due: defaultAmount, status: 'DUE' };
-            }
-        });
+        const sPaidRecords = sRecords.filter(r => r.status === 'PAID');
+        const pPaidRecords = pRecords.filter(r => r.status === 'PAID');
         
-        // Monthly Charge: 2000 for A/C, 500 for B (Service Charge)
-        // For Parking, it's 0 by default unless we have a way to know.
-        let monthlyCharge = 0;
-        if (viewMode === 'SERVICE') {
-            monthlyCharge = (unit.slice(-1) !== 'B') ? 2000 : 500;
-        } else {
-            // Parking Charge: Maybe calculate average paid amount? Or just 0.
-            // Let's use 0 for now as it varies.
-            monthlyCharge = 0;
-        }
-        
-        // Total Due for the year
-        const totalDue = records.reduce((sum, r) => sum + r.due, 0);
-        
-        // Last Payment Date (Latest PAID record)
-        const paidRecords = records.filter(r => r.status === 'PAID');
-        const lastPaidRecord = paidRecords.length > 0 ? paidRecords[paidRecords.length - 1] : null;
-        const lastPaymentDate = lastPaidRecord ? lastPaidRecord.date : '-';
+        const sLastPaid = sPaidRecords.length > 0 ? sPaidRecords[sPaidRecords.length - 1].date : '-';
+        const pLastPaid = pPaidRecords.length > 0 ? pPaidRecords[pPaidRecords.length - 1].date : '-';
         
         return {
             unit,
-            ownerName: ownerName,
-            monthlyCharge,
-            totalDue,
-            lastPaymentDate,
-            paymentMethod: 'Cash' // Hardcoded as per request
+            ownerName,
+            sTotalDue,
+            sTotalCharge,
+            pTotalDue,
+            pTotalCharge,
+            totalDue: sTotalDue + pTotalDue,
+            totalCharge: sTotalCharge + pTotalCharge,
+            sLastPaid,
+            pLastPaid,
+            lastPaymentDate: sLastPaid !== '-' ? sLastPaid : pLastPaid,
+            paymentMethod: 'Cash'
         };
     });
   }, [selectedYear, dbData, unitsInfo, lang, viewMode, visibleUnits, externalUnits]);
@@ -1421,10 +1441,23 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
 
             <div className="space-y-3">
                 <div className="bg-slate-50 dark:bg-slate-700/30 rounded-xl p-3 border border-slate-100 dark:border-slate-700">
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-xs text-slate-500 dark:text-slate-400">মাসিক চার্জ</span>
-                        <span className="text-sm font-bold text-slate-700 dark:text-slate-300">৳ {selectedUnitSummary.monthlyCharge.toLocaleString()}</span>
-                    </div>
+                    {viewMode === 'COMBINED' ? (
+                        <>
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs text-slate-500 dark:text-slate-400">সার্ভিস মোট চার্জ</span>
+                                <span className="text-sm font-bold text-indigo-600">৳ {selectedUnitSummary.sTotalCharge.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs text-slate-500 dark:text-slate-400">পার্কিং মোট চার্জ</span>
+                                <span className="text-sm font-bold text-violet-600">৳ {selectedUnitSummary.pTotalCharge.toLocaleString()}</span>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs text-slate-500 dark:text-slate-400">মাসিক চার্জ</span>
+                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">৳ {selectedUnitSummary.monthlyCharge?.toLocaleString() || 0}</span>
+                        </div>
+                    )}
                     <div className="flex justify-between items-center mb-2">
                         <span className="text-xs text-slate-500 dark:text-slate-400">সর্বশেষ পেমেন্ট</span>
                         <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{selectedUnitSummary.lastPaymentDate}</span>
@@ -1869,8 +1902,9 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
           {/* Option 1 */}
           <button 
             onClick={() => {
-                setViewMode('SERVICE');
+                setViewMode('COMBINED');
                 setShowParkingView(false);
+                onSummaryToggle(true);
             }}
             className="w-full bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between group active:scale-[0.98] transition-all hover:border-primary-500 dark:hover:border-primary-400"
           >
@@ -1879,7 +1913,7 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
                 <Wallet size={24} />
               </div>
               <div className="text-left">
-                <h3 className="text-base font-bold text-slate-800 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">সার্ভিস চার্জ সহ পার্কিং চার্জ</h3>
+                <h3 className="text-base font-bold text-slate-800 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">সার্ভিস চার্জ ও পার্কিং চার্জ</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">এক সাথে দেখুন</p>
               </div>
             </div>
@@ -3767,7 +3801,9 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
                   <ArrowLeft size={20} />
                 </button>
                 <div className="flex-1">
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">{t.allUnitsCalc}</h2>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">
+                        {viewMode === 'COMBINED' ? 'সার্ভিস ও পার্কিং চার্জ সামারি' : t.allUnitsCalc}
+                    </h2>
                     <p className="text-xs text-primary-600 dark:text-primary-400 font-medium">{t.financialYear}: {selectedYear}</p>
                 </div>
              </div>
@@ -3838,7 +3874,9 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
                         <thead>
                             <tr className="bg-slate-50 dark:bg-slate-700 border-b border-slate-100 dark:border-slate-600">
                                 <th className="py-3 pl-4 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t.unit}</th>
-                                <th className="py-3 text-center text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t.totalCollected}</th>
+                                <th className="py-3 text-center text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                    {viewMode === 'COMBINED' ? 'মোট চার্জ (S+P)' : t.totalCollected}
+                                </th>
                                 <th className="py-3 pr-4 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{t.totalDue}</th>
                             </tr>
                         </thead>
@@ -3861,13 +3899,28 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
                                         </div>
                                     </td>
                                     <td className="py-3 text-center">
-                                        <span className={`text-sm font-semibold ${data.collected > 0 ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}`}>
-                                            {data.collected > 0 ? `৳ ${data.collected.toLocaleString()}` : '-'}
-                                        </span>
+                                        {viewMode === 'COMBINED' ? (
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">
+                                                    ৳ {data.totalCharge.toLocaleString()}
+                                                </span>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <span className="text-[8px] font-bold text-slate-400">S: ৳{data.sTotal.toLocaleString()}</span>
+                                                    <span className="text-[8px] font-bold text-slate-400">P: ৳{data.pTotal.toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <span className={`text-sm font-semibold ${data.collected > 0 ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                                                {data.collected > 0 ? `৳ ${data.collected.toLocaleString()}` : '-'}
+                                            </span>
+                                        )}
                                     </td>
                                     <td className="py-3 pr-4 text-right">
                                         {data.due > 0 ? (
-                                            <span className="text-sm font-bold text-red-500 dark:text-red-400">৳ {data.due.toLocaleString()}</span>
+                                            <div className="flex flex-col items-end">
+                                                {viewMode === 'COMBINED' && <span className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">Total Due</span>}
+                                                <span className="text-sm font-bold text-red-500 dark:text-red-400">৳ {data.due.toLocaleString()}</span>
+                                            </div>
                                         ) : (
                                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded-full">
                                                 <CheckCircle2 size={10} /> {t.paid}
@@ -3892,9 +3945,9 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
                 </button>
                 <div className="flex-1">
                     <h2 className="text-xl font-bold text-slate-800 dark:text-white">
-                        {viewMode === 'PARKING' ? 'পার্কিং চার্জ বকেয়া সামারি' : 'সার্ভিস চার্জ বকেয়া সামারি'}
+                        সার্ভিস ও পার্কিং চার্জ সামারি
                     </h2>
-                    <p className="text-xs text-primary-600 dark:text-primary-400 font-medium">২০২৫ ও ২০২৬ সাল</p>
+                    <p className="text-xs text-primary-600 dark:text-primary-400 font-medium">২০২৫ ও ২০২৬ সাল | ২৭ টি ইউনিট</p>
                 </div>
              </div>
 
@@ -3908,15 +3961,15 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
                      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 mb-6">
                          <div className="grid grid-cols-2 gap-3 mb-3">
                              <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 text-center border border-red-100 dark:border-red-800/50 flex flex-col items-center justify-center">
-                                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">২০২৫ মোট বকেয়া</p>
+                                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">সার্ভিস মোট চার্জ</p>
                                  <div className="flex items-baseline gap-1">
-                                     <p className="text-lg sm:text-xl font-black text-red-600 dark:text-red-400 whitespace-nowrap">৳ {dueSummaryData.reduce((sum, item) => sum + item.due2025, 0).toLocaleString()}</p>
+                                     <p className="text-lg sm:text-xl font-black text-indigo-600 dark:text-indigo-400 whitespace-nowrap">৳ {dueSummaryData.reduce((sum, item) => sum + item.sTotal2025 + item.sTotal2026, 0).toLocaleString()}</p>
                                  </div>
                              </div>
                              <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-3 text-center border border-orange-100 dark:border-orange-800/50 flex flex-col items-center justify-center">
-                                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">২০২৬ মোট বকেয়া</p>
+                                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">পার্কিং মোট চার্জ</p>
                                  <div className="flex items-baseline gap-1">
-                                     <p className="text-lg sm:text-xl font-black text-orange-600 dark:text-orange-400 whitespace-nowrap">৳ {dueSummaryData.reduce((sum, item) => sum + item.due2026, 0).toLocaleString()}</p>
+                                     <p className="text-lg sm:text-xl font-black text-violet-600 dark:text-violet-400 whitespace-nowrap">৳ {dueSummaryData.reduce((sum, item) => sum + item.pTotal2025 + item.pTotal2026, 0).toLocaleString()}</p>
                                  </div>
                              </div>
                          </div>
@@ -3925,76 +3978,74 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
                                  <div className="bg-indigo-100 dark:bg-indigo-900/30 p-1.5 rounded-full text-indigo-600 dark:text-indigo-400">
                                      <Wallet size={14} />
                                  </div>
-                                 <span className="text-xs font-bold text-slate-600 dark:text-slate-300">সর্বমোট বকেয়া</span>
+                                 <span className="text-xs font-bold text-slate-600 dark:text-slate-300">সর্বমোট চার্জ</span>
                              </div>
-                             <span className="text-base font-black text-indigo-600 dark:text-indigo-400 whitespace-nowrap">৳ {dueSummaryData.reduce((sum, item) => sum + item.due2025 + item.due2026, 0).toLocaleString()}</span>
+                             <span className="text-base font-black text-indigo-600 dark:text-indigo-400 whitespace-nowrap">৳ {dueSummaryData.reduce((sum, item) => sum + item.sTotal2025 + item.sTotal2026 + item.pTotal2025 + item.pTotal2026, 0).toLocaleString()}</span>
                          </div>
                      </div>
 
                      {/* 27 Units List */}
                      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden mb-8">
                          <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300">ইউনিট ভিত্তিক বকেয়া তালিকা</h3>
+                             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300">ইউনিট ভিত্তিক চার্জ তালিকা (সার্ভিস + পার্কিং)</h3>
                          </div>
                          <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                             {dueSummaryData.map((item, idx) => (
-                                 <div 
-                                     key={idx} 
-                                     onClick={() => {
-                                         onUnitSelect(item.unit);
-                                         setShowDueSummary(false);
-                                     }}
-                                     className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
-                                 >
-                                     <div className="flex items-center gap-3">
-                                         <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
-                                             {item.unit}
+                             {dueSummaryData.map((item, idx) => {
+                                 const totalCharge = item.sTotal2025 + item.sTotal2026 + item.pTotal2025 + item.pTotal2026;
+                                 
+                                 return (
+                                     <div 
+                                         key={idx} 
+                                         onClick={() => {
+                                             onUnitSelect(item.unit);
+                                             setShowDueSummary(false);
+                                         }}
+                                         className="p-4 flex flex-col gap-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+                                     >
+                                         <div className="flex items-center justify-between">
+                                             <div className="flex items-center gap-3">
+                                                 <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+                                                     {item.unit}
+                                                 </div>
+                                                 <div>
+                                                     <p className="text-xs font-bold text-slate-700 dark:text-slate-200">মোট চার্জ</p>
+                                                     <p className="text-sm font-black text-indigo-600 dark:text-indigo-400">
+                                                         ৳ {totalCharge.toLocaleString()}
+                                                     </p>
+                                                 </div>
+                                             </div>
+                                             <div className="text-right">
+                                                 <ChevronRight size={16} className="text-slate-400" />
+                                             </div>
+                                         </div>
+                                         
+                                         <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/50">
+                                             <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
+                                                 <p className="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">সার্ভিস চার্জ</p>
+                                                 <div className="flex justify-between text-[11px]">
+                                                     <span className="text-slate-500">২০২৫: <span className="text-indigo-500 font-bold">৳{item.sTotal2025}</span></span>
+                                                     <span className="text-slate-500">২০২৬: <span className="text-indigo-500 font-bold">৳{item.sTotal2026}</span></span>
+                                                 </div>
+                                             </div>
+                                             <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
+                                                 <p className="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">পার্কিং চার্জ</p>
+                                                 <div className="flex justify-between text-[11px]">
+                                                     <span className="text-slate-500">২০২৫: <span className="text-violet-500 font-bold">৳{item.pTotal2025}</span></span>
+                                                     <span className="text-slate-500">২০২৬: <span className="text-violet-500 font-bold">৳{item.pTotal2026}</span></span>
+                                                 </div>
+                                             </div>
                                          </div>
                                      </div>
-                                     <div className="flex gap-4 text-right">
-                                         <div>
-                                             <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">২০২৫</p>
-                                             <p className={`text-sm font-bold ${item.due2025 > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                                                 {item.due2025 > 0 ? `৳ ${item.due2025.toLocaleString()}` : '0'}
-                                             </p>
-                                         </div>
-                                         <div>
-                                             <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">২০২৬</p>
-                                             <p className={`text-sm font-bold ${item.due2026 > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'}`}>
-                                                 {item.due2026 > 0 ? `৳ ${item.due2026.toLocaleString()}` : '0'}
-                                             </p>
-                                         </div>
-                                         <div className="pl-2 border-l border-slate-200 dark:border-slate-700">
-                                             <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">মোট</p>
-                                             <p className={`text-sm font-bold ${(item.due2025 + item.due2026) > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                                                 {(item.due2025 + item.due2026) > 0 ? `৳ ${(item.due2025 + item.due2026).toLocaleString()}` : '0'}
-                                             </p>
-                                         </div>
-                                     </div>
-                                 </div>
-                             ))}
+                                 );
+                             })}
                          </div>
                          <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex justify-between items-center">
-                             <h3 className="text-sm font-bold text-slate-800 dark:text-white">সর্বমোট বকেয়া</h3>
-                             <div className="flex gap-4 text-right">
-                                 <div>
-                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">২০২৫</p>
-                                     <p className="text-sm font-bold text-red-600 dark:text-red-400">
-                                         ৳ {dueSummaryData.reduce((sum, item) => sum + item.due2025, 0).toLocaleString()}
-                                     </p>
-                                 </div>
-                                 <div>
-                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">২০২৬</p>
-                                     <p className="text-sm font-bold text-orange-600 dark:text-orange-400">
-                                         ৳ {dueSummaryData.reduce((sum, item) => sum + item.due2026, 0).toLocaleString()}
-                                     </p>
-                                 </div>
-                                 <div className="pl-2 border-l border-slate-200 dark:border-slate-700">
-                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">মোট</p>
-                                     <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                                         ৳ {dueSummaryData.reduce((sum, item) => sum + item.due2025 + item.due2026, 0).toLocaleString()}
-                                     </p>
-                                 </div>
+                             <h3 className="text-sm font-bold text-slate-800 dark:text-white">সর্বমোট চার্জ</h3>
+                             <div className="text-right">
+                                 <p className="text-lg font-black text-indigo-600 dark:text-indigo-400">
+                                     ৳ {dueSummaryData.reduce((sum, item) => sum + item.sTotal2025 + item.sTotal2026 + item.pTotal2025 + item.pTotal2026, 0).toLocaleString()}
+                                 </p>
+                                 <p className="text-[10px] text-slate-500 dark:text-slate-400">সার্ভিস + পার্কিং (২০২৫-২৬)</p>
                              </div>
                          </div>
                      </div>
@@ -4159,15 +4210,34 @@ export const ServiceChargeView: React.FC<ServiceChargeViewProps> = ({
                                     {item.unit}
                                 </span>
                                 <div className="flex flex-col items-center gap-0.5 w-full">
-                                    <div className="h-1 w-full bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
-                                        <div 
-                                            className={`h-full rounded-full ${item.totalDue > 0 ? 'bg-red-500' : 'bg-green-500'}`}
-                                            style={{ width: '100%' }}
-                                        ></div>
-                                    </div>
-                                    <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 mt-0.5">
-                                        {item.totalDue > 0 ? 'বকেয়া' : 'পরিশোধিত'}
-                                    </span>
+                                    {viewMode === 'COMBINED' ? (
+                                        <div className="flex flex-col gap-0.5 w-full">
+                                            <div className="flex justify-between items-center w-full">
+                                                <span className="text-[7px] font-bold text-slate-400">S:</span>
+                                                <span className="text-[7px] font-bold text-indigo-500">
+                                                    ৳{item.sTotalCharge}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center w-full">
+                                                <span className="text-[7px] font-bold text-slate-400">P:</span>
+                                                <span className="text-[7px] font-bold text-indigo-500">
+                                                    ৳{item.pTotalCharge}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="h-1 w-full bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
+                                                <div 
+                                                    className={`h-full rounded-full ${item.totalDue > 0 ? 'bg-red-500' : 'bg-green-500'}`}
+                                                    style={{ width: '100%' }}
+                                                ></div>
+                                            </div>
+                                            <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 mt-0.5">
+                                                {item.totalDue > 0 ? 'বকেয়া' : 'পরিশোধিত'}
+                                            </span>
+                                        </>
+                                    )}
                                 </div>
                             </button>
                         ))}
